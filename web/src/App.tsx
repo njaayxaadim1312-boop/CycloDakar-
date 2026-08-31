@@ -6,6 +6,8 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
+import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
+import { ActivityDetailPage } from '@/pages/activities/ActivityDetailPage'
 import { MemberDetailPage } from '@/pages/members/MemberDetailPage'
 import { MemberFormPage } from '@/pages/members/MemberFormPage'
 import { MembersPage } from '@/pages/members/MembersPage'
@@ -27,10 +29,17 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 2  /login, /register, /forgot-password, /reset-password
  *   PHASE 3  /members, /members/nouveau, /members/:uuid, /members/:uuid/modifier
  *   PHASE 4  /profile
+ *   PHASE 7  /activities, /activities/:uuid
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
-const IMPLEMENTED = new Set(['/dashboard', '/system', '/members', '/profile'])
+const IMPLEMENTED = new Set([
+  '/dashboard',
+  '/system',
+  '/members',
+  '/profile',
+  '/activities',
+])
 
 export default function App() {
   return (
@@ -63,6 +72,10 @@ export default function App() {
           <Route path="/members/nouveau" element={<MemberFormPage />} />
           <Route path="/members/:uuid" element={<MemberDetailPage />} />
           <Route path="/members/:uuid/modifier" element={<MemberFormPage />} />
+
+          {/* Activités — phase 7 */}
+          <Route path="/activities" element={<ActivitiesPage />} />
+          <Route path="/activities/:uuid" element={<ActivityDetailPage />} />
 
           {allNavItems
             .filter((item) => !IMPLEMENTED.has(item.to))

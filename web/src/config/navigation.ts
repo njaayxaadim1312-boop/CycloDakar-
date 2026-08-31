@@ -75,7 +75,7 @@ export const navigation: NavSection[] = [
         to: '/activities',
         label: 'Activités',
         icon: Bike,
-        phase: 8,
+        phase: 1,
         summary:
           'Historique des sorties enregistrées au GPS, avec carte, distance, durée, vitesse et dénivelé. Filtrable par sport et par période.',
       },

@@ -176,7 +176,7 @@ curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/config
 
 # Tests
-cd backend && php artisan test     # 176 tests (sur MySQL)
+cd backend && php artisan test     # 187 tests (sur MySQL)
 cd mobile  && npm test             # 34 tests (écrans + filtre GPS)
 ```
 
@@ -250,7 +250,8 @@ CycloDakar/
 | 4 | Interface web | ✅ **Terminée** |
 | 5 | Interface mobile | ✅ **Terminée** |
 | 6 | GPS et tracking | ✅ **Terminée** |
-| 7–8 | Carte, statistiques, historique | ⏳ |
+| 7 | Carte et statistiques | ✅ **Terminée** |
+| 8 | Historique et records | ⏳ à venir |
 | 9–12 | Événements, participations, paiements | ⏳ |
 | 13–14 | Caisse et rapports financiers | ⏳ |
 | 15–20 | Vidéo, challenges, notifications, tests, sécurité, déploiement | ⏳ |

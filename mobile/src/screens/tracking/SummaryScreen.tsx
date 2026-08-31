@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../components/Button'
+import { TraceMap } from '../../components/TraceMap'
 import { getLocalActivity, type LocalActivity } from '../../lib/database'
 import {
   formatDistance,
@@ -105,6 +106,11 @@ export function SummaryScreen({ uuid, onClose }: SummaryScreenProps) {
           </Text>
         </View>
 
+        {/* --- Parcours ------------------------------------------------------ */}
+        {/* Lu depuis la base LOCALE : la carte s'affiche sans reseau,
+            immediatement apres l'arret. */}
+        <TraceMap activityUuid={uuid} height={220} />
+
         {/* --- Statistiques -------------------------------------------------- */}
         <View style={styles.grid}>
           <Stat label="Temps actif" value={formatDuration(movingS)} colors={colors} />
@@ -186,8 +192,8 @@ export function SummaryScreen({ uuid, onClose }: SummaryScreenProps) {
         </View>
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
-          La carte du parcours, les zones traversées et le graphique d'altitude
-          arrivent en phase 7.
+          Les zones traversées et le profil d'altitude apparaîtront sur la fiche
+          détaillée, une fois la sortie transmise au club.
         </Text>
       </ScrollView>
 

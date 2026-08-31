@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ActivityStatus;
+use App\Jobs\ResolveActivityZones;
 use App\Models\Activity;
 use App\Models\ActivityStat;
 use App\Services\Gps\ActivityStatsCalculator;
@@ -189,6 +190,18 @@ final class ActivitySyncService
                     'computed_at' => now(),
                 ],
             );
+
+            /*
+             * Les zones traversees sont resolues APRES coup, en file
+             * d'attente. Nominatim impose une seconde entre deux requetes :
+             * les calculer ici ferait attendre le membre une douzaine de
+             * secondes devant un ecran fige, apres une sortie de trois heures.
+             *
+             * `afterCommit` : le job ne part qu'une fois la transaction
+             * validee. Sans cela, il pourrait chercher une activite que la
+             * base n'a pas encore.
+             */
+            ResolveActivityZones::dispatch($activity->id)->afterCommit();
 
             return $activity->fresh(['stats']);
         });

@@ -47,7 +47,21 @@ upload_max_filesize = 20M
 post_max_size = 25M
 ```
 
-et décommentez (retirez le `;` devant) :
+Ajoutez également le **bundle de certificats racine**, sans lequel PHP sous
+Windows ne peut valider aucun certificat HTTPS — tout appel sortant (géocodage
+Nominatim, envoi de courriels, notifications push) échouerait avec
+« unable to get local issuer certificate » :
+
+```powershell
+curl.exe -L -o C:\php83\cacert.pem https://curl.se/ca/cacert.pem
+```
+
+```ini
+curl.cainfo = "C:/php83/cacert.pem"
+openssl.cafile = "C:/php83/cacert.pem"
+```
+
+Puis décommentez (retirez le `;` devant) :
 
 ```ini
 extension=bcmath
@@ -253,6 +267,8 @@ Cela nécessite Android Studio et un JDK 17. C'est documenté au moment voulu da
 | Le mobile affiche « Serveur injoignable » | Pare-feu, mauvais Wi-Fi, ou `--host=0.0.0.0` oublié | Voir §6 |
 | `EADDRINUSE :::4000` | Le service Node tourne déjà | Fermer l'autre terminal, ou changer `PORT` |
 | Composer très lent sous Windows | Antivirus qui scanne chaque fichier | Exclure `C:\CycloDakar` de l'analyse temps réel |
+| `unable to get local issuer certificate` | Bundle de certificats absent | Voir §1, `curl.cainfo` |
+| Les zones traversées restent vides | File d'attente non traitée | `php artisan queue:work` dans `backend/` |
 | `npm ERR! ERESOLVE` | Conflit de dépendances React Native | `npx expo install <paquet>` plutôt que `npm install` |
 
 ---

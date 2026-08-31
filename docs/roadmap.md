@@ -216,11 +216,33 @@ Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 
 ---
 
-## ⏳ Phase 7 — Carte et statistiques
+## ✅ Phase 7 — Carte et statistiques *(terminée)*
 
-Leaflet + OpenStreetMap côté web, `react-native-maps` côté mobile, affichage de la
-trace, marqueurs départ/arrivée, simplification Douglas-Peucker, polyline encodée,
-zones traversées par reverse-geocoding groupé, graphiques vitesse/altitude.
+**Zones traversées**
+
+- Regroupement sur une grille de 2,2 km : une sortie de 30 min déclenche **4 à 5
+  appels** de géocodage au lieu de 1 800.
+- Cache définitif en base — mais **jamais** en cas de panne du service : sinon
+  une coupure de dix minutes empoisonnerait le territoire pour toujours.
+- Résolution en file d'attente : Nominatim impose une seconde entre deux
+  requêtes, le membre n'a pas à attendre douze secondes après sa sortie.
+- Vérifié en conditions réelles : `Médina · Biscuiterie · Grand Yoff · Patte d'Oie`.
+
+**Web**
+
+- Carte Leaflet + OpenStreetMap, trace décodée depuis la polyline (~1 Ko),
+  marqueurs départ/arrivée dessinés en HTML.
+- Historique filtrable, fiche détaillée complète (§22 du cahier des charges).
+- Profil d'altitude à échelle cadrée sur le relief réel, splits kilométriques
+  avec le meilleur kilomètre en orange.
+- Encart « qualité du signal GPS » qui explique les positions écartées.
+
+**Mobile**
+
+- Carte du parcours sur le résumé, lue depuis la base **locale** : elle
+  s'affiche sans réseau, immédiatement après l'arrêt.
+- Trace décimée à 500 points pour ne pas faire ramer les téléphones d'entrée
+  de gamme.
 
 ---
 
