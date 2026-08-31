@@ -55,7 +55,7 @@ Erreur :
 | 404 | Introuvable (`NOT_FOUND`) |
 | 409 | Conflit (synchronisation incomplète, état incompatible) |
 | 422 | Validation échouée (`VALIDATION_FAILED`) |
-| 429 | Limite de débit atteinte |
+| 429 | Limite de débit atteinte (`TOO_MANY_ATTEMPTS`) |
 | 501 | Fonctionnalité prévue mais non encore livrée |
 
 ### Authentification
@@ -79,7 +79,8 @@ Authorization: Bearer <token Sanctum>
 |---|---|---|
 | `api` | 120/min authentifié, 30/min anonyme | général |
 | `login` | 5/min par identifiant, 20/min par IP | connexion |
-| `password-reset` | 5/h par IP | mot de passe oublié |
+| `password-reset` | 5/h par IP | **demande** de réinitialisation |
+| `password-reset-confirm` | 15/h par IP | **usage** du lien reçu (compteur distinct) |
 | `gps-sync` | 240/min | ingestion de points |
 | `qr-scan` | 60/min | scan de QR sur le terrain |
 
@@ -98,7 +99,7 @@ La conversion en km, km/h, min/km et en heure de Dakar se fait **côté client**
 
 ---
 
-## 2. Routes livrées (phase 1)
+## 2. Routes livrées (phases 1 et 2)
 
 ### `GET /health` — public
 
@@ -135,24 +136,140 @@ exactement les mêmes seuils que le recalcul serveur (voir [gps.md](gps.md)).
 
 Ne contient **aucun** secret.
 
+### `POST /auth/register` — public
+
+```json
+{
+  "name": "Awa Ndiaye",
+  "phone": "77 123 45 67",
+  "email": null,
+  "password": "cyclo2026",
+  "password_confirmation": "cyclo2026",
+  "device_name": "Chrome · Windows"
+}
+```
+
+→ `201` avec `{ token, user }`.
+
+Au moins **un** identifiant est requis : téléphone ou email. Le téléphone est
+normalisé (`+221 77 123 45 67`, `00221771234567` et `771234567` désignent le même
+compte). Le rôle n'est **jamais** lu dans la requête : tout compte créé ici est
+`MEMBER`.
+
+### `POST /auth/login` — public
+
+```json
+{ "login": "77 123 45 67", "password": "cyclo2026", "device_name": "Tecno Spark 10" }
+```
+
+`login` accepte l'email **ou** le téléphone, sous n'importe quelle mise en forme.
+
+| Cas | Réponse |
+|---|---|
+| Succès | `200` `{ token, user }` |
+| Mauvais mot de passe **ou** compte inexistant | `422` `INVALID_CREDENTIALS` — **réponse strictement identique** dans les deux cas, pour ne pas permettre d'énumérer les membres |
+| Compte désactivé | `403` `ACCOUNT_DISABLED` |
+| Plus de 5 tentatives par minute | `429` `TOO_MANY_ATTEMPTS` |
+
+Une connexion réussie **remet le compteur de tentatives à zéro**.
+
+### `POST /auth/forgot-password` — public
+
+```json
+{ "login": "awa@cyclodakar.sn" }
+```
+
+Renvoie **toujours** le même message, que le compte existe ou non.
+Seule exception : un compte sans adresse email renvoie `422` `NO_EMAIL_ON_ACCOUNT` —
+il ne peut pas se dépanner seul, autant le dire.
+
+Le lien envoyé pointe vers l'**application web** (`FRONTEND_URL`), pas vers Laravel :
+`{FRONTEND_URL}/reset-password?token=…&login=…`
+
+Limite : 5 demandes par heure et par IP.
+
+### `POST /auth/reset-password` — public
+
+```json
+{ "token": "…", "login": "awa@cyclodakar.sn", "password": "…", "password_confirmation": "…" }
+```
+
+Le jeton ne sert qu'**une fois**. La réinitialisation **révoque toutes les sessions** :
+si la demande fait suite à une compromission, l'intrus perd l'accès immédiatement.
+
+Limite : **compteur distinct** de la demande (15/h). Avec un compteur commun, un
+membre ayant redemandé cinq liens ne pourrait plus utiliser celui qui arrive.
+
 ### `GET /me` — authentifié
 
-Utilisateur courant. Sert de sonde de validité du token.
+Utilisateur courant, avec son rôle et ses capacités. Sert de sonde de validité du jeton.
+
+```json
+{
+  "data": {
+    "uuid": "638befd7-…",
+    "name": "Awa Ndiaye",
+    "email": null,
+    "phone": "771234567",
+    "phone_formatted": "77 123 45 67",
+    "role": "MEMBER",
+    "role_label": "Membre",
+    "abilities": { "collect": false, "manage_finance": false, "administer": false },
+    "is_active": true,
+    "last_login_at": "2026-08-31T15:20:00+00:00"
+  }
+}
+```
+
+`abilities` sert au client à **masquer** ce qui est inaccessible — jamais à
+autoriser. L'autorisation réelle est refaite côté serveur à chaque requête.
+
+L'identifiant auto-incrémenté n'est **jamais** exposé : seul l'`uuid` circule.
+
+### `POST /auth/logout` — authentifié
+
+```json
+{ "all_devices": false }
+```
+
+Par défaut, seul le jeton courant est révoqué : se déconnecter du web ne doit pas
+couper le téléphone en pleine sortie GPS. `all_devices: true` révoque tout — c'est
+le geste à faire quand on perd son téléphone.
+
+### `POST /auth/change-password` — authentifié
+
+```json
+{
+  "current_password": "…",
+  "password": "…",
+  "password_confirmation": "…",
+  "logout_other_devices": true
+}
+```
+
+Le mot de passe actuel est exigé même si la session est valide : un téléphone laissé
+déverrouillé ne doit pas suffire à verrouiller le compte de son propriétaire.
+
+### Contrôle par rôle
+
+Le middleware `role:` raisonne en **rôle minimum** :
+
+```php
+Route::middleware('role:TREASURER')  // trésorier, administrateur, super administrateur
+```
+
+Sans cela, il faudrait énumérer les rôles supérieurs sur chaque route financière,
+et l'oubli finirait par arriver. Refus : `403` `FORBIDDEN`.
+
+Le middleware `active` est appliqué à **toutes** les routes authentifiées : un compte
+désactivé perd l'accès immédiatement, sans attendre l'expiration de son jeton, et le
+jeton présenté est révoqué au passage.
 
 ---
 
-## 3. Routes à venir, par phase
+## 4. Routes à venir, par phase
 
-### Phase 2 — Authentification
 
-```http
-POST   /auth/register              { name, phone, email?, password }
-POST   /auth/login                 { login, password }            → { token, user }
-POST   /auth/logout
-POST   /auth/forgot-password       { login }
-POST   /auth/reset-password        { token, password }
-POST   /auth/change-password       { current_password, password }
-```
 
 ### Phase 3 — Membres
 
@@ -274,7 +391,7 @@ PATCH  /settings
 
 ---
 
-## 4. Documentation interactive
+## 5. Documentation interactive
 
 À partir de la **phase 19**, un schéma **OpenAPI 3.1** est généré et servi sur
 `/api/documentation` (Swagger UI). D'ici là, ce document fait foi.

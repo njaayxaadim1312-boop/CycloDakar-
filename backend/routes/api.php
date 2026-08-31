@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\HealthController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,8 +18,8 @@ use Illuminate\Support\Facades\Route;
 | version pour permettre une v2 sans casser les applications déjà installées
 | sur les téléphones des membres (que l'on ne maîtrise pas).
 |
-| Les routes des phases suivantes sont annoncées ici en commentaire afin que
-| la surface de l'API reste lisible d'un seul coup d'œil. Voir docs/api.md.
+| Les routes des phases suivantes sont annoncées en commentaire afin que la
+| surface de l'API reste lisible d'un seul coup d'œil. Voir docs/api.md.
 |
 */
 
@@ -41,29 +42,57 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     | Authentification — PHASE 2
     |--------------------------------------------------------------------------
     |
-    | POST   /auth/register
-    | POST   /auth/login              (throttle: 5/min)
-    | POST   /auth/forgot-password
-    | POST   /auth/reset-password
+    | Limites de débit spécifiques : la connexion et la demande de
+    | réinitialisation sont les deux points qu'on attaque en premier.
+    | `login` compte par identifiant ET par IP (voir AppServiceProvider) pour
+    | qu'un attaquant ne puisse pas verrouiller le compte d'un membre.
     |
     */
+    Route::prefix('auth')->name('auth.')->group(function (): void {
+        Route::post('/register', [AuthController::class, 'register'])
+            ->middleware('throttle:6,1')
+            ->name('register');
+
+        // La limitation de debit de la connexion est portee par
+        // LoginRequest, qui peut remettre le compteur a zero apres une
+        // connexion reussie -- ce que le middleware throttle ne permet pas.
+        Route::post('/login', [AuthController::class, 'login'])->name('login');
+
+        Route::post('/forgot-password', [PasswordResetController::class, 'forgot'])
+            ->middleware('throttle:password-reset')
+            ->name('forgot-password');
+
+        Route::post('/reset-password', [PasswordResetController::class, 'reset'])
+            ->middleware('throttle:password-reset-confirm')
+            ->name('reset-password');
+    });
 
     /*
     |--------------------------------------------------------------------------
     | Routes authentifiées
     |--------------------------------------------------------------------------
+    |
+    | `active` révoque immédiatement l'accès d'un compte désactivé, sans
+    | attendre l'expiration de son jeton.
+    |
     */
-    Route::middleware('auth:sanctum')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'active'])->group(function (): void {
 
-        // Utilisateur courant. Disponible dès maintenant : c'est la sonde qui
-        // permet au client de savoir si son token est encore valide.
-        Route::get('/me', fn (Request $request) => [
-            'data' => $request->user()?->only(['id', 'uuid', 'name', 'email', 'role']),
-        ])->name('me');
+        Route::get('/me', [AuthController::class, 'me'])->name('me');
+        Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+        Route::post('/auth/change-password', [AuthController::class, 'changePassword'])
+            ->name('auth.change-password');
 
         /*
-        | PHASE 2  — POST /auth/logout, POST /auth/change-password
-        | PHASE 3  — /members, /members/{id}, /members/search
+        |----------------------------------------------------------------------
+        | Exemples de routes protégées par rôle (à décommenter avec le module)
+        |----------------------------------------------------------------------
+        |
+        | Route::middleware('role:COLLECTOR')->group(...)   PHASE 12
+        | Route::middleware('role:TREASURER')->group(...)   PHASE 13
+        | Route::middleware('role:ADMIN')->group(...)       PHASE 19
+        |
+        | PHASE 3  — /members, /members/{uuid}, /members/search
         | PHASE 6  — /activities, /activities/{uuid}/points, /finalize
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations
@@ -82,7 +111,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     | Routes internes (service Node.js) — PHASE 15
     |--------------------------------------------------------------------------
     |
-    | Protégées par signature HMAC, jamais par un token utilisateur : c'est un
+    | Protégées par signature HMAC, jamais par un jeton utilisateur : c'est un
     | service qui appelle, pas une personne. Node n'écrit jamais directement en
     | base ; il rend compte ici.
     |

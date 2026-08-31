@@ -69,6 +69,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | URL de l'application front
+    |--------------------------------------------------------------------------
+    |
+    | L'API ne rend aucune page : les liens envoyes par courriel (comme la
+    | reinitialisation de mot de passe) doivent pointer vers l'application web,
+    | pas vers une route Laravel.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

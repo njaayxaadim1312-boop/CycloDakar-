@@ -122,11 +122,59 @@ export interface AppConfig {
   }
 }
 
-/** Utilisateur connecté (phase 2). */
+/* -------------------------------------------------------------------------- */
+/* Authentification (phase 2)                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Capacités calculées par le serveur.
+ *
+ * Elles servent à MASQUER ce qui est inaccessible — jamais à autoriser :
+ * l'autorisation réelle est refaite à chaque requête côté Laravel. Un client
+ * modifié ne gagne donc aucun droit, il ne fait que s'afficher différemment.
+ */
+export interface UserAbilities {
+  collect: boolean
+  manage_finance: boolean
+  administer: boolean
+}
+
 export interface CurrentUser {
-  id: number
   uuid: string
   name: string
   email: string | null
+  phone: string | null
+  phone_formatted: string | null
   role: RoleCode
+  role_label: string
+  abilities: UserAbilities
+  is_active: boolean
+  last_login_at: string | null
+  created_at: string | null
+}
+
+/** Réponse de POST /auth/login et /auth/register. */
+export interface AuthResult {
+  token: string
+  user: CurrentUser
+}
+
+export interface RegisterPayload {
+  name: string
+  email?: string | null
+  phone?: string | null
+  password: string
+  password_confirmation: string
+  device_name?: string
+}
+
+export interface LoginPayload {
+  /** Adresse email OU numéro de téléphone, sous n'importe quelle forme. */
+  login: string
+  password: string
+  device_name?: string
+}
+
+export interface MessageResult {
+  message: string
 }

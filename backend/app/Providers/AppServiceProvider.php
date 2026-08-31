@@ -63,8 +63,16 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(20)->by($request->ip()),
         ]);
 
-        // Mot de passe oublié : coûteux (envoi de mail), donc très limité.
+        // DEMANDE de réinitialisation : coûteuse (envoi de courriel), donc
+        // très limitée.
         RateLimiter::for('password-reset', fn (Request $request) => Limit::perHour(5)->by($request->ip()));
+
+        // USAGE du lien reçu : compteur SÉPARÉ. Avec un compteur commun, un
+        // membre qui a demandé cinq liens (parce qu'il ne les recevait pas)
+        // se retrouverait incapable d'utiliser celui qui arrive enfin.
+        // Reste limité : le jeton est aléatoire, mais on ne facilite pas
+        // l'essai en force.
+        RateLimiter::for('password-reset-confirm', fn (Request $request) => Limit::perHour(15)->by($request->ip()));
 
         // Synchronisation GPS : un membre rentrant d'une sortie de 3 h peut
         // envoyer 100 lots d'affilée. La limite est par utilisateur.

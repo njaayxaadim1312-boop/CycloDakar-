@@ -24,13 +24,40 @@ identité visuelle, documentation d'architecture.
 
 ---
 
-## ⏳ Phase 2 — Authentification
+## ✅ Phase 2 — Authentification *(terminée)*
 
-Inscription, connexion (email **ou** téléphone), déconnexion, mot de passe oublié,
-changement de mot de passe, tokens Sanctum, `users.role`, middleware de rôle,
-protection des routes web et mobile, écrans de connexion.
+**Backend**
 
-*Dépend de : phase 1.*
+- Table `users` étendue : `uuid` public, téléphone, rôle, activation, dernière
+  connexion, suppression douce.
+- Énumération `UserRole` hiérarchique (5 rôles) avec capacités dérivées.
+- Normalisation des numéros sénégalais : `+221 77 123 45 67`, `00221771234567` et
+  `771234567` désignent le même compte — c'est ce qui empêche les doublons.
+- Connexion par **email ou téléphone**, avec la même réponse pour « mot de passe
+  incorrect » et « compte inexistant » : l'API ne permet pas d'énumérer les membres.
+- Limitation de débit par identifiant **et** par IP, remise à zéro après succès.
+- Mot de passe oublié / réinitialisation, lien pointant vers l'application web,
+  jeton à usage unique, révocation de toutes les sessions après changement.
+- Changement de mot de passe exigeant le mot de passe actuel.
+- Déconnexion par appareil ou de tous les appareils.
+- Middlewares `role:` (rôle minimum) et `active` (compte désactivé = accès coupé
+  immédiatement, jeton révoqué au passage).
+- Seeder : compte super administrateur + 3 comptes de démonstration en local.
+
+**Web**
+
+- Écrans Connexion, Inscription, Mot de passe oublié, Nouveau mot de passe.
+- Garde de route, session vérifiée au démarrage, redirection vers la page demandée.
+- Menu latéral filtré par rôle, menu de compte avec déconnexion simple ou globale.
+
+**Mobile**
+
+- Écrans Connexion et Inscription, accueil connecté, jeton dans le trousseau
+  sécurisé du téléphone.
+- Hors ligne : une coupure réseau au démarrage **ne déconnecte pas** — un membre
+  sans data au départ d'une sortie doit rester connecté.
+
+**Tests** — 75 tests, 209 assertions, tous au vert.
 
 ---
 

@@ -94,7 +94,7 @@ cd backend
 composer install
 copy .env.example .env
 php artisan key:generate
-php artisan migrate
+php artisan migrate --seed    # cree le compte administrateur
 php artisan cyclo:doctor      # diagnostic complet de l'environnement
 php artisan serve             # http://localhost:8000
 ```
@@ -176,7 +176,24 @@ curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/config
 ```
 
-Puis ouvrez **http://localhost:5173** : la page affiche l'état des services en direct.
+Puis ouvrez **http://localhost:5173**.
+
+### Comptes de démonstration
+
+Créés par `php artisan migrate --seed` (mot de passe : `CycloDakar2026!`) :
+
+| Rôle | Email | Téléphone |
+|---|---|---|
+| Super administrateur | `admin@cyclodakar.sn` | 77 000 00 00 |
+| Collecteur | `collecteur@cyclodakar.sn` | 77 000 00 01 |
+| Trésorier | `tresorier@cyclodakar.sn` | 77 000 00 02 |
+| Membre | `membre@cyclodakar.sn` | 77 000 00 03 |
+
+La connexion accepte **l'email ou le téléphone**, dans n'importe quel format.
+Changez le mot de passe de l'administrateur dès la première connexion.
+
+En développement, `MAIL_MAILER=log` : les courriels de réinitialisation ne partent
+pas, ils sont écrits dans `backend/storage/logs/laravel.log`.
 
 ---
 
@@ -221,8 +238,8 @@ CycloDakar/
 | Phase | Objet | État |
 |---|---|---|
 | 1 | Initialisation, structure, environnement | ✅ **Terminée** |
-| 2 | Authentification | ⏳ à venir |
-| 3 | Membres, rôles, QR Code | ⏳ |
+| 2 | Authentification | ✅ **Terminée** |
+| 3 | Membres, matricules, QR Code | ⏳ à venir |
 | 4–5 | Interfaces web et mobile | ⏳ |
 | 6–8 | GPS, carte, statistiques, historique | ⏳ |
 | 9–12 | Événements, participations, paiements | ⏳ |

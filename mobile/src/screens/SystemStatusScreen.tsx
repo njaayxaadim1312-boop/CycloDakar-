@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar'
 import {
   ActivityIndicator,
   Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -33,7 +34,12 @@ const SPORT_EMOJI: Record<SportCode, string> = {
   HIKING: '🥾',
 }
 
-export function SystemStatusScreen() {
+interface SystemStatusScreenProps {
+  /** Fourni quand l'ecran est ouvert depuis l'accueil (utilisateur connecte). */
+  onBack?: () => void
+}
+
+export function SystemStatusScreen({ onBack }: SystemStatusScreenProps = {}) {
   const { colors, isDark } = useTheme()
 
   const health = useQuery({
@@ -88,11 +94,19 @@ export function SystemStatusScreen() {
           </View>
         </View>
 
+        {onBack && (
+          <Pressable onPress={onBack} hitSlop={8} style={styles.back}>
+            <Text style={[styles.backText, { color: colors.orangeText }]}>
+              ← Retour à l'accueil
+            </Text>
+          </Pressable>
+        )}
+
         <Text style={[styles.kicker, { color: colors.orangeText }]}>
-          PHASE 1 — INITIALISATION
+          DIAGNOSTIC
         </Text>
         <Text style={[styles.title, { color: colors.text }]}>
-          L'application mobile est prête
+          Connexion à la plateforme
         </Text>
         <Text style={[styles.lede, { color: colors.textMuted }]}>
           Cet écran vérifie que le téléphone atteint bien l'API du club. Tirez vers
@@ -211,7 +225,7 @@ export function SystemStatusScreen() {
         </View>
 
         <Text style={[styles.footer, { color: colors.textMuted }]}>
-          Prochaines étapes : authentification (phase 2), puis GPS (phase 6).
+          Prochaine étape : membres et QR Code (phase 3), puis GPS (phase 6).
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -338,4 +352,6 @@ const styles = StyleSheet.create({
   swatchName: { fontSize: fontSize.caption, textAlign: 'center' },
 
   footer: { fontSize: fontSize.caption, textAlign: 'center', marginTop: spacing.sm },
+  back: { paddingVertical: spacing.xs },
+  backText: { fontSize: fontSize.small, fontWeight: '700' },
 })

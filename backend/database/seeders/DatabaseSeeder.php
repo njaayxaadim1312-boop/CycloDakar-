@@ -1,25 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * Point d'entrée des données initiales.
+ *
+ * Le trait `WithoutModelEvents` du squelette Laravel a été retiré
+ * volontairement : il désactive les événements Eloquent, or `User::creating`
+ * est ce qui génère l'`uuid` public. Avec le trait, tout enregistrement créé
+ * par un seeder partirait sans identifiant public.
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            AdminUserSeeder::class,
         ]);
     }
 }

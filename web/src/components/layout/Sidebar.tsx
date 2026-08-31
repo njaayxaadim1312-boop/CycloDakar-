@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
 import { navigation } from '@/config/navigation'
+import { canAccess, useCurrentUser } from '@/stores/auth'
 
 interface SidebarProps {
   /** Ouvert en superposition sur mobile ; toujours visible à partir de `lg`. */
@@ -23,6 +24,18 @@ interface SidebarProps {
  * depuis un téléphone par les membres du bureau.
  */
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const user = useCurrentUser()
+
+  // On masque ce qui est inaccessible plutot que de l'afficher pour le refuser
+  // ensuite. C'est du confort d'affichage, pas une mesure de securite :
+  // Laravel revalide le role a chaque requete.
+  const sections = navigation
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccess(user, item.roles)),
+    }))
+    .filter((section) => section.items.length > 0)
+
   return (
     <>
       {/* Voile de fond, mobile uniquement */}
@@ -59,7 +72,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* --- Liste de navigation ------------------------------------------- */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navigation.map((section) => (
+          {sections.map((section) => (
             <div key={section.title} className="mb-5 last:mb-0">
               <p className="px-3 pb-1.5 text-[0.6875rem] font-bold tracking-[0.08em] text-[var(--cd-text-muted)] uppercase">
                 {section.title}

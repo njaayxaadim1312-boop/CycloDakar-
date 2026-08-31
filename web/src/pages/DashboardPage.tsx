@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getData } from '@/lib/api'
+import { useCurrentUser } from '@/stores/auth'
 import type { Health } from '@/types/api'
 
 /**
@@ -22,6 +23,8 @@ import type { Health } from '@/types/api'
  * bureau. Chaque tuile annonce la phase qui lui donnera sa valeur.
  */
 export function DashboardPage() {
+  const user = useCurrentUser()
+
   const health = useQuery({
     queryKey: ['health'],
     queryFn: () => getData<Health>('/health'),
@@ -36,10 +39,11 @@ export function DashboardPage() {
       {/* --- Bandeau d'accueil -------------------------------------------- */}
       <section className="overflow-hidden rounded-[var(--cd-radius-lg)] bg-[var(--cd-orange)] px-5 py-6 sm:px-7 sm:py-8">
         <p className="text-xs font-bold tracking-[0.1em] text-black/60 uppercase">
-          Saison 2026
+          Saison 2026 · {user?.role_label}
         </p>
         <h2 className="mt-1 text-2xl text-[var(--cd-black)] sm:text-3xl">
-          Bienvenue sur la plateforme du club
+          {/* Le prenom seul : plus chaleureux, et plus court sur mobile. */}
+          Bonjour {user?.name.split(' ')[0] ?? ''}
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/75">
           Sorties GPS, événements, participations et caisse réunis au même endroit.
@@ -122,7 +126,7 @@ export function DashboardPage() {
 
           <ol className="mt-4 space-y-2.5">
             <PhaseRow n={1} label="Initialisation, structure, environnement" done />
-            <PhaseRow n={2} label="Authentification" />
+            <PhaseRow n={2} label="Authentification" done />
             <PhaseRow n={3} label="Membres, rôles et QR Code" />
             <PhaseRow n={6} label="GPS et enregistrement des sorties" />
             <PhaseRow n={12} label="Paiements et encaissements" />

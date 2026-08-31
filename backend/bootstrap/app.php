@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -31,6 +32,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->throttleApi('api');
 
+        $middleware->alias([
+            // Rôle MINIMUM requis : role:TREASURER laisse aussi passer
+            // ADMIN et SUPER_ADMIN.
+            'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+            'active' => \App\Http\Middleware\EnsureAccountIsActive::class,
+        ]);
+
         // Les clients de l'API sont React et React Native : ils attendent
         // toujours du JSON, jamais une redirection vers une page de connexion.
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/login');
@@ -48,11 +56,17 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return match (true) {
+                // On respecte le statut porté par l'exception : une
+                // ValidationException vaut 422 par défaut, mais la limitation
+                // de débit de la connexion en lève une avec 429. Forcer 422
+                // ici ferait passer un blocage pour une simple faute de saisie.
                 $e instanceof ValidationException => ApiResponse::error(
-                    message: 'Les données envoyées sont invalides.',
-                    status: 422,
+                    message: $e->status === 429
+                        ? 'Trop de tentatives. Patientez avant de réessayer.'
+                        : 'Les données envoyées sont invalides.',
+                    status: $e->status,
                     errors: $e->errors(),
-                    code: 'VALIDATION_FAILED',
+                    code: $e->status === 429 ? 'TOO_MANY_ATTEMPTS' : 'VALIDATION_FAILED',
                 ),
 
                 $e instanceof AuthenticationException => ApiResponse::error(
@@ -72,6 +86,16 @@ return Application::configure(basePath: dirname(__DIR__))
                     message: 'Ressource introuvable.',
                     status: 404,
                     code: 'NOT_FOUND',
+                ),
+
+                // Le middleware `throttle` lève une HttpException dont le
+                // message est « Too Many Attempts. », en anglais. On le
+                // remplace : l'application est en français, y compris quand
+                // elle refuse.
+                $e instanceof ThrottleRequestsException => ApiResponse::error(
+                    message: 'Trop de requêtes. Patientez avant de réessayer.',
+                    status: 429,
+                    code: 'TOO_MANY_ATTEMPTS',
                 ),
 
                 $e instanceof HttpExceptionInterface => ApiResponse::error(
