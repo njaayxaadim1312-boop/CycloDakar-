@@ -177,7 +177,7 @@ curl http://localhost:8000/api/v1/config
 
 # Tests
 cd backend && php artisan test     # 176 tests (sur MySQL)
-cd mobile  && npm test             # 19 tests d'écrans
+cd mobile  && npm test             # 34 tests (écrans + filtre GPS)
 ```
 
 Puis ouvrez **http://localhost:5173**.
@@ -249,7 +249,7 @@ CycloDakar/
 | 3 | Membres, matricules et rôles | ✅ **Terminée** |
 | 4 | Interface web | ✅ **Terminée** |
 | 5 | Interface mobile | ✅ **Terminée** |
-| 6 | GPS et tracking | 🚧 backend livré |
+| 6 | GPS et tracking | ✅ **Terminée** |
 | 7–8 | Carte, statistiques, historique | ⏳ |
 | 9–12 | Événements, participations, paiements | ⏳ |
 | 13–14 | Caisse et rapports financiers | ⏳ |

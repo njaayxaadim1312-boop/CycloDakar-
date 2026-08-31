@@ -167,7 +167,7 @@ refus d'afficher des chiffres inventés.
 
 ---
 
-## 🚧 Phase 6 — GPS et tracking *(backend terminé, mobile en cours)*
+## ✅ Phase 6 — GPS et tracking *(terminée)*
 
 ### ✅ Livré : le domaine GPS côté serveur
 
@@ -183,13 +183,34 @@ refus d'afficher des chiffres inventés.
   contrainte `UNIQUE(activity_id, seq)` absorbe le rejeu d'un lot.
 - **Le client n'est jamais cru** : tout est recalculé serveur à la finalisation.
 
-### ⏳ Reste à livrer : la capture mobile
+### ✅ Livré : la capture mobile
 
-Tâche de localisation en arrière-plan, stockage SQLite local, file de
-synchronisation, écran de tracking, écran de résumé.
+- **Tâche de localisation en arrière-plan** (`expo-task-manager`) enregistrée au
+  chargement du module, avec service de premier plan Android. L'enregistrement
+  continue écran éteint et survit à la mort de l'application.
+- **Base SQLite locale** en mode WAL : chaque point est écrit immédiatement.
+  Une batterie vide en pleine sortie ne perd rien.
+- **Filtre GPS miroir du serveur**, avec les seuils servis par `GET /config`.
+- **File de synchronisation reprenable** : ouverture, lots, finalisation —
+  chaque étape est marquée en base, une coupure ne fait pas tout recommencer.
+- **Écrans** : choix du sport avec explication des autorisations *avant* la
+  demande système, suivi en direct, résumé.
+- **Reprise automatique** : si Android a tué l'application en pleine sortie, la
+  trace est retrouvée en base et la capture relancée.
 
 ⚠️ Nécessite une **Development Build** Expo (Expo Go ne gère pas la localisation
-en arrière-plan). JDK 17 et le SDK Android sont présents sur le poste.
+en arrière-plan). JDK 17 et le SDK Android sont présents sur le poste :
+
+```powershell
+cd mobile
+npx expo install expo-dev-client
+npx expo run:android
+```
+
+**Tests** — 34 tests mobiles, dont le filtre GPS qui rejoue les mêmes cas que le
+serveur : les deux implémentations doivent donner le même verdict sur la même
+trace, sinon le membre verrait une distance pendant sa sortie et une autre
+après synchronisation.
 
 Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 

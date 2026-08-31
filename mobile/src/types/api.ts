@@ -319,3 +319,124 @@ export interface DashboardStats {
   finance: { visible: boolean; available?: false; phase?: number }
   generated_at: string
 }
+
+/* -------------------------------------------------------------------------- */
+/* Activités et GPS (phase 6)                                                  */
+/* -------------------------------------------------------------------------- */
+
+export type ActivityStatusCode = 'RECORDING' | 'COMPLETED' | 'DISCARDED'
+export type ActivityVisibilityCode = 'PRIVATE' | 'CLUB' | 'PUBLIC'
+
+export interface Coordinate {
+  lat: number
+  lng: number
+}
+
+export interface ActivityBounds {
+  min_lat: number
+  min_lng: number
+  max_lat: number
+  max_lng: number
+}
+
+/** Un kilomètre de la sortie. */
+export interface ActivitySplit {
+  km: number
+  duration_s: number
+  pace_s_per_km: number
+  speed_mps: number
+}
+
+/**
+ * Qualité du signal GPS de la sortie.
+ *
+ * Réservé au propriétaire : c'est SA mesure, et le premier élément à regarder
+ * quand une trace lui paraît fausse.
+ */
+export interface ActivitySignal {
+  raw_points_count: number
+  filtered_out: number
+  quality_percent: number | null
+}
+
+/**
+ * Une sortie enregistrée.
+ *
+ * **Toutes les grandeurs sont en unités SI** : mètres, secondes, m/s. La
+ * conversion en km, km/h et min/km est faite à l'affichage — voir
+ * `lib/format.ts`. C'est ce qui évite les bugs de type « km stocké, mètres
+ * affichés ».
+ */
+export interface Activity {
+  uuid: string
+  title: string
+  custom_title: string | null
+  notes?: string | null
+
+  sport: SportCode
+  sport_label: string
+  uses_pace: boolean
+
+  status: ActivityStatusCode
+  status_label: string
+  visibility: ActivityVisibilityCode
+  visibility_label: string
+
+  started_at: string | null
+  ended_at: string | null
+
+  distance_m: number
+  duration_s: number
+  moving_time_s: number
+  paused_time_s: number
+  avg_speed_mps: number
+  max_speed_mps: number
+  elevation_gain_m: number
+  elevation_loss_m: number
+  min_altitude_m: number | null
+  max_altitude_m: number | null
+  avg_pace_s_per_km: number | null
+  best_pace_s_per_km: number | null
+  calories_kcal: number | null
+
+  /** Trace simplifiée, encodée au format Google Polyline (~1 Ko). */
+  polyline: string | null
+  bounds: ActivityBounds | null
+  start: Coordinate | null
+  end: Coordinate | null
+  zones: string[]
+
+  points_count: number
+  signal?: ActivitySignal
+
+  member?: {
+    uuid: string
+    full_name: string
+    initials: string
+    photo_url: string | null
+  }
+
+  stats?: {
+    splits: ActivitySplit[]
+    elevation_profile: { d: number; a: number }[]
+    speed_histogram: Record<string, number>
+  }
+
+  synced_at: string | null
+  created_at: string | null
+
+  permissions?: {
+    update: boolean
+    delete: boolean
+  }
+}
+
+/** Réponse de POST /activities/{uuid}/points. */
+export interface PointsIngestResult {
+  received: number
+  accepted: number
+  rejected: number
+  rejection_reasons: Record<string, number>
+  last_seq: number | null
+  total_points: number
+}

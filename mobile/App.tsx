@@ -2,6 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { ApiError } from './src/lib/api'
+// Import a effet de bord : enregistre la tache de localisation en
+// arriere-plan. Android relance ce contexte a froid apres avoir tue
+// l'application et cherche immediatement une tache portant ce nom --
+// l'import doit donc avoir lieu au demarrage, avant tout rendu.
+import './src/services/locationTask'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { ThemeProvider } from './src/theme/useTheme'
 

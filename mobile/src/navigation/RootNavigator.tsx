@@ -1,13 +1,14 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { NavigationContainer, type Theme as NavTheme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { Bike, Users, UserRound } from 'lucide-react-native'
+import { Bike, Play, Users, UserRound } from 'lucide-react-native'
 import { useEffect } from 'react'
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native'
 import { HomeScreen } from '../screens/HomeScreen'
 import { MemberDetailScreen } from '../screens/MemberDetailScreen'
 import { MembersScreen } from '../screens/MembersScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
+import { TrackingNavigator } from './TrackingNavigator'
 import { SystemStatusScreen } from '../screens/SystemStatusScreen'
 import { LoginScreen } from '../screens/auth/LoginScreen'
 import { RegisterScreen } from '../screens/auth/RegisterScreen'
@@ -21,9 +22,9 @@ import { useTheme } from '../theme/useTheme'
  *   non connecté  →  pile Connexion / Inscription
  *   connecté      →  onglets Accueil · Membres · Profil
  *
- * Trois onglets seulement. La place centrale de la barre est laissée libre :
- * elle accueillera le bouton « Démarrer une sortie » en phase 6, qui est le
- * geste principal de l'application et mérite d'être atteint sans réfléchir.
+ * L'onglet central « Démarrer » est le geste principal de l'application : il
+ * est au milieu de la barre, là où le pouce tombe naturellement, et porte une
+ * pastille orange qui le distingue des autres.
  *
  * L'aiguillage se fait par la présence d'une session, pas par une navigation
  * impérative : quand un jeton est révoqué (compte désactivé, déconnexion
@@ -137,6 +138,33 @@ function AppTabs() {
         )}
       </Tabs.Screen>
 
+      {/*
+        Onglet central, volontairement mis en avant. `unmountOnBlur` est
+        DÉSACTIVÉ par défaut, et c'est ce qu'on veut : quitter l'onglet
+        pendant une sortie ne doit rien interrompre — l'enregistrement vit de
+        toute façon dans la tâche de fond et dans SQLite.
+      */}
+      <Tabs.Screen
+        name="Démarrer"
+        component={TrackingNavigator}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <View
+              style={[
+                styles.startTab,
+                { backgroundColor: focused ? colors.orange : colors.orangeSoft },
+              ]}
+            >
+              <Play
+                color={focused ? colors.black : colors.orangeText}
+                size={20}
+                fill={focused ? colors.black : colors.orangeText}
+              />
+            </View>
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="Membres"
         component={MembersNavigator}
@@ -219,6 +247,13 @@ function Splash() {
 }
 
 const styles = StyleSheet.create({
+  startTab: {
+    width: 44,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   splash: {
     flex: 1,
     alignItems: 'center',

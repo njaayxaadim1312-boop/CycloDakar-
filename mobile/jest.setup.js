@@ -10,6 +10,13 @@
 // lecture du theme) part hors de act() et les assertions echouent.
 global.IS_REACT_ACT_ENVIRONMENT = true
 
+// Delai des requetes asynchrones (`findBy`, `waitFor`).
+// Le defaut de 1 s suffit a un ecran isole, mais pas quand plusieurs
+// suites Expo se disputent le processeur : le rendu legitime depassait
+// alors le delai et le test echouait sans qu'aucun code ne soit fautif.
+const { configure } = require('@testing-library/react-native')
+configure({ asyncUtilTimeout: 8000 })
+
 // Depuis la version 12.4, les matchers (`toBeOnTheScreen`...) sont fournis
 // automatiquement par @testing-library/react-native : plus rien a importer.
 
