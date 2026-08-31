@@ -1,0 +1,153 @@
+/*
+ * ============================================================================
+ * CYCLO DAKAR — Jetons de design
+ * ============================================================================
+ *
+ * Source : assets/brand/prototype-design-system.jpg (planche officielle du club)
+ * Documentation : docs/design-system.md
+ *
+ * Règle du projet : AUCUNE couleur en dur ailleurs que dans ce fichier.
+ * Un composant qui a besoin d'une nouvelle teinte l'ajoute ici d'abord.
+ * ============================================================================
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Palette de marque (issue de la planche) --------------------------- */
+  --cd-orange: #ff8c00;
+  --cd-black: #1a1a1a;
+  --cd-blue: #004080;
+  --cd-green: #32cd32;
+
+  /* Variantes dérivées, nécessaires à une interface complète.
+     `--cd-orange-text` est la seule teinte orange utilisable pour du TEXTE :
+     #FF8C00 sur blanc n'atteint que 2,3:1, ce qui est illisible.
+     #C46A00 atteint 4,6:1 (AA pour texte normal). */
+  --cd-orange-text: #c46a00;
+  --cd-orange-hover: #e67e00;
+  --cd-orange-soft: #fff4e6;
+  --cd-blue-hover: #003366;
+  --cd-blue-soft: #e6eef5;
+  --cd-green-hover: #28a428;
+  --cd-green-soft: #eafaea;
+
+  /* ---- Surfaces --------------------------------------------------------- */
+  --cd-bg: #f7f7f8;
+  --cd-surface: #ffffff;
+  --cd-surface-2: #f2f2f4;
+  --cd-border: #e4e4e7;
+  --cd-border-strong: #d1d1d6;
+
+  /* ---- Texte ------------------------------------------------------------ */
+  --cd-text: #1a1a1a;
+  --cd-text-muted: #6b7280;
+  --cd-text-inverse: #ffffff;
+
+  /* ---- États ------------------------------------------------------------ */
+  --cd-danger: #dc2626;
+  --cd-danger-soft: #fee2e2;
+  --cd-warning: #d97706;
+  --cd-warning-soft: #fef3c7;
+  --cd-success: var(--cd-green);
+  --cd-success-soft: var(--cd-green-soft);
+  --cd-disabled-bg: #d4d4d8;
+  --cd-disabled-text: #8a8a8f;
+
+  /* ---- Sports (couleur d'identification constante dans toute l'app) ------ */
+  --cd-sport-cycling: var(--cd-orange);
+  --cd-sport-running: var(--cd-blue);
+  --cd-sport-hiking: var(--cd-green);
+
+  /* ---- Rayons ----------------------------------------------------------- */
+  --cd-radius-sm: 8px;
+  --cd-radius: 12px;
+  --cd-radius-lg: 20px;
+  --cd-radius-pill: 999px;
+
+  /* ---- Ombres (discrètes : la planche est plate) ------------------------- */
+  --cd-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+  --cd-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.04);
+  --cd-shadow-lg: 0 8px 32px rgb(0 0 0 / 0.10);
+
+  /* ---- Typographie ------------------------------------------------------ */
+  --cd-font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --cd-font-display:
+    'Archivo', 'Inter Tight', 'Inter', system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+
+  /* ---- Divers ----------------------------------------------------------- */
+  --cd-header-h: 60px;
+  --cd-sidebar-w: 248px;
+  --cd-transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+ * Mode sombre. Deux déclencheurs :
+ *  - `[data-theme="dark"]` posé par le sélecteur de thème (choix explicite) ;
+ *  - `prefers-color-scheme` quand l'utilisateur n'a rien choisi.
+ * Seules les couleurs changent : rayons, typo et espacements restent identiques.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --cd-orange-text: #ffa733;
+  --cd-orange-soft: #33240a;
+  --cd-blue-soft: #0d1f33;
+  --cd-green-soft: #10240f;
+
+  --cd-bg: #111113;
+  --cd-surface: #1c1c1f;
+  --cd-surface-2: #26262a;
+  --cd-border: #2e2e33;
+  --cd-border-strong: #3f3f46;
+
+  --cd-text: #f4f4f5;
+  --cd-text-muted: #9ca3af;
+  --cd-text-inverse: #1a1a1a;
+
+  --cd-danger: #f87171;
+  --cd-danger-soft: #3b1414;
+  --cd-warning: #fbbf24;
+  --cd-warning-soft: #35260a;
+  --cd-disabled-bg: #3f3f46;
+  --cd-disabled-text: #71717a;
+
+  --cd-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --cd-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+  --cd-shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --cd-orange-text: #ffa733;
+    --cd-orange-soft: #33240a;
+    --cd-blue-soft: #0d1f33;
+    --cd-green-soft: #10240f;
+
+    --cd-bg: #111113;
+    --cd-surface: #1c1c1f;
+    --cd-surface-2: #26262a;
+    --cd-border: #2e2e33;
+    --cd-border-strong: #3f3f46;
+
+    --cd-text: #f4f4f5;
+    --cd-text-muted: #9ca3af;
+    --cd-text-inverse: #1a1a1a;
+
+    --cd-danger: #f87171;
+    --cd-danger-soft: #3b1414;
+    --cd-warning: #fbbf24;
+    --cd-warning-soft: #35260a;
+    --cd-disabled-bg: #3f3f46;
+    --cd-disabled-text: #71717a;
+
+    --cd-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --cd-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
+    --cd-shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
+  }
+}

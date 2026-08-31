@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Cyclo Dakar — fichiers ignorés à la racine du dépôt
+# Chaque sous-projet (backend, web, mobile, services) a son propre .gitignore.
+# ---------------------------------------------------------------------------
+
+# Secrets : jamais dans le dépôt. Seuls les .env.example sont versionnés.
+.env
+.env.*
+!.env.example
+
+# Dépendances
+node_modules/
+vendor/
+
+# Constructions
+dist/
+build/
+.expo/
+*.tsbuildinfo
+
+# Uploads et fichiers générés en local
+storage/app/public/*
+!storage/app/public/.gitkeep
+services/storage/video/*
+!services/storage/video/.gitkeep
+
+# Sauvegardes de base
+database/dumps/*.sql
+!database/dumps/.gitkeep
+
+# Outils et systèmes
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json

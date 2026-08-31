@@ -1,0 +1,95 @@
+{
+  "expo": {
+    "name": "Cyclo Dakar",
+    "slug": "cyclo-dakar",
+    "scheme": "cyclodakar",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F7F7F8",
+    "primaryColor": "#FF8C00",
+    "assetBundlePatterns": ["**/*"],
+
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF",
+      "dark": {
+        "backgroundColor": "#111113"
+      }
+    },
+
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "sn.cyclodakar.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationWhenInUseUsageDescription": "Cyclo Dakar utilise votre position pour enregistrer le tracé, la distance et la vitesse de vos sorties.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Cyclo Dakar continue d'enregistrer votre sortie lorsque l'écran est éteint ou que vous utilisez une autre application. Sans cette autorisation, votre parcours s'arrêterait dès que vous quittez l'application.",
+        "NSCameraUsageDescription": "Prenez des photos géolocalisées pendant vos sorties et scannez les QR Codes des membres lors des collectes.",
+        "NSPhotoLibraryUsageDescription": "Ajoutez des photos à vos activités et des justificatifs à vos dépenses.",
+        "NSMotionUsageDescription": "Le baromètre améliore nettement la précision du dénivelé par rapport au GPS seul."
+      }
+    },
+
+    "android": {
+      "package": "sn.cyclodakar.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FF8C00",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ]
+    },
+
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Cyclo Dakar continue d'enregistrer votre sortie lorsque l'écran est éteint.",
+          "locationWhenInUsePermission": "Cyclo Dakar utilise votre position pour tracer votre parcours.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Photos géolocalisées de vos sorties et scan des QR Codes membres."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ajoutez des photos à vos activités et des justificatifs à vos dépenses."
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-notifications"
+    ],
+
+    "extra": {
+      "apiUrl": "http://10.0.2.2:8000/api/v1"
+    }
+  }
+}

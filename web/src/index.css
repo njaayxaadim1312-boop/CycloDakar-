@@ -1,0 +1,192 @@
+@import './styles/tokens.css';
+@import 'tailwindcss';
+
+/*
+ * Pont entre les jetons CSS (source unique, docs/design-system.md) et les
+ * utilitaires Tailwind. On expose les jetons plutôt que de redéfinir des
+ * couleurs : `bg-brand` et `var(--cd-orange)` désignent toujours la même chose.
+ */
+@theme {
+  --color-brand: var(--cd-orange);
+  --color-brand-hover: var(--cd-orange-hover);
+  --color-brand-text: var(--cd-orange-text);
+  --color-brand-soft: var(--cd-orange-soft);
+
+  --color-ink: var(--cd-black);
+  --color-ocean: var(--cd-blue);
+  --color-ocean-hover: var(--cd-blue-hover);
+  --color-ocean-soft: var(--cd-blue-soft);
+  --color-trace: var(--cd-green);
+  --color-trace-hover: var(--cd-green-hover);
+  --color-trace-soft: var(--cd-green-soft);
+
+  --color-bg: var(--cd-bg);
+  --color-surface: var(--cd-surface);
+  --color-surface-2: var(--cd-surface-2);
+  --color-line: var(--cd-border);
+  --color-line-strong: var(--cd-border-strong);
+
+  --color-body: var(--cd-text);
+  --color-muted: var(--cd-text-muted);
+
+  --color-danger: var(--cd-danger);
+  --color-danger-soft: var(--cd-danger-soft);
+  --color-warning: var(--cd-warning);
+  --color-warning-soft: var(--cd-warning-soft);
+
+  --font-sans: var(--cd-font-sans);
+  --font-display: var(--cd-font-display);
+
+  --radius-card: var(--cd-radius);
+  --radius-pill: var(--cd-radius-pill);
+}
+
+@layer base {
+  * {
+    border-color: var(--cd-border);
+  }
+
+  html {
+    /* Le web est consulté sur téléphone en plein soleil : on évite le zoom
+       automatique de Safari sur les champs et les rebonds de scroll. */
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--cd-bg);
+    color: var(--cd-text);
+    font-family: var(--cd-font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--cd-font-display);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin: 0;
+  }
+
+  /* Les chiffres de statistiques ne doivent pas « danser » quand ils
+     changent pendant un enregistrement GPS. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Anneau de focus visible : l'app est utilisée au clavier côté web par le
+     trésorier, qui saisit beaucoup. */
+  :focus-visible {
+    outline: 2px solid var(--cd-orange);
+    outline-offset: 2px;
+    border-radius: var(--cd-radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Carte de contenu — la brique de base de toutes les pages. */
+  .cd-card {
+    background-color: var(--cd-surface);
+    border: 1px solid var(--cd-border);
+    border-radius: var(--cd-radius);
+    box-shadow: var(--cd-shadow-sm);
+  }
+
+  /* Bouton pilule de la planche : grande cible tactile, utilisable avec des
+     gants, lisible en plein soleil. */
+  .cd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.25rem;
+    border: 0;
+    border-radius: var(--cd-radius-pill);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    transition:
+      background-color var(--cd-transition),
+      transform var(--cd-transition);
+    white-space: nowrap;
+  }
+
+  .cd-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .cd-btn:disabled {
+    background-color: var(--cd-disabled-bg);
+    color: var(--cd-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .cd-btn-primary {
+    background-color: var(--cd-orange);
+    color: var(--cd-black); /* 7,9:1 — contraste largement AAA */
+  }
+
+  .cd-btn-primary:hover:not(:disabled) {
+    background-color: var(--cd-orange-hover);
+  }
+
+  .cd-btn-dark {
+    background-color: var(--cd-black);
+    color: #fff;
+  }
+
+  .cd-btn-dark:hover:not(:disabled) {
+    background-color: #000;
+  }
+
+  .cd-btn-ocean {
+    background-color: var(--cd-blue);
+    color: #fff;
+  }
+
+  .cd-btn-ocean:hover:not(:disabled) {
+    background-color: var(--cd-blue-hover);
+  }
+
+  .cd-btn-ghost {
+    background-color: transparent;
+    color: var(--cd-text);
+    border: 1px solid var(--cd-border-strong);
+  }
+
+  .cd-btn-ghost:hover:not(:disabled) {
+    background-color: var(--cd-surface-2);
+  }
+
+  /* Étiquette de statut (payé, en attente, synchronisé...). */
+  .cd-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--cd-radius-pill);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+}

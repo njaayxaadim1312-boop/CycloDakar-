@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/jpeg" href="/brand/logo.jpg" />
+    <link rel="apple-touch-icon" href="/brand/logo.jpg" />
+
+    <title>Cyclo Dakar</title>
+    <meta
+      name="description"
+      content="Plateforme du club Cyclo Dakar : sorties GPS, événements, participations et gestion de la caisse."
+    />
+
+    <!-- La barre d'adresse mobile suit le thème de la page. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111113" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      // Applique le thème enregistré AVANT le premier rendu, pour éviter
+      // le flash blanc quand l'utilisateur a choisi le mode sombre.
+      try {
+        var choice = localStorage.getItem('cd.theme')
+        if (choice === 'dark' || choice === 'light') {
+          document.documentElement.setAttribute('data-theme', choice)
+        }
+      } catch (e) {
+        /* stockage bloqué : on laisse prefers-color-scheme décider */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      Cyclo Dakar nécessite JavaScript pour fonctionner.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
