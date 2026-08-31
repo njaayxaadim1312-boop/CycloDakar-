@@ -76,4 +76,19 @@ class ActivityFactory extends Factory
             'raw_points_count' => $movingTimeS,
         ]);
     }
+
+    /**
+     * Allures renseignees.
+     *
+     * Volontairement separe de `withStats()` : en production, l'allure n'est
+     * calculee que pour la course et la marche. Une sortie velo garde ces
+     * colonnes a NULL, et les records doivent savoir l'ignorer.
+     */
+    public function paces(int $avgSPerKm, ?int $bestSPerKm = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'avg_pace_s_per_km' => $avgSPerKm,
+            'best_pace_s_per_km' => $bestSPerKm ?? $avgSPerKm,
+        ]);
+    }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { findNavItem } from '@/config/navigation'
+import { findNavItem, isDelivered } from '@/config/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 
@@ -41,7 +41,11 @@ export function AppLayout() {
       <div className="lg:pl-[var(--cd-sidebar-w)]">
         <Header
           title={current?.label ?? 'Cyclo Dakar'}
-          subtitle={current && current.phase > 1 ? `Livré en phase ${current.phase}` : undefined}
+          subtitle={
+            current !== undefined && !isDelivered(current)
+              ? `À venir en phase ${current.phase}`
+              : undefined
+          }
           onOpenMenu={() => setMenuOpen(true)}
         />
 

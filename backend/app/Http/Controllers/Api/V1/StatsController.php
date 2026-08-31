@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ActivityStatus;
 use App\Enums\MemberStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\Activity;
 use App\Models\Member;
+use App\Services\Gps\PersonalStatsService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Statistiques du tableau de bord.
@@ -29,19 +33,83 @@ final class StatsController extends Controller
     /** Nombre de mois d'historique dans la courbe des adhésions. */
     private const GROWTH_MONTHS = 12;
 
+    /**
+     * Cumuls et records personnels du membre connecté.
+     *
+     * `GET /stats/me?period=week|month|year|all`
+     *
+     * Les cumuls suivent la période demandée ; les **records portent toujours
+     * sur toute la carrière** — un record du mois n'est pas un record.
+     */
+    public function me(Request $request, PersonalStatsService $stats): JsonResponse
+    {
+        $validated = $request->validate([
+            'period' => ['nullable', Rule::in(['week', 'month', 'year', 'all'])],
+        ]);
+
+        $member = $request->user()->member;
+
+        if ($member === null) {
+            return ApiResponse::error(
+                message: "Aucune fiche membre n'est associée à votre compte.",
+                status: 404,
+                code: 'NO_MEMBER_PROFILE',
+            );
+        }
+
+        return ApiResponse::ok($stats->forMember($member, $validated['period'] ?? 'month'));
+    }
+
     public function dashboard(Request $request): JsonResponse
     {
         return ApiResponse::ok([
             'members' => $this->memberStats(),
 
-            // Modules à venir. `null` et non 0 : voir le commentaire de classe.
-            'activities' => $this->pending(8),
+            // Les activités sont mesurables depuis la phase 6.
+            'activities' => $this->activityStats(),
+
+            // Modules à venir. `available: false` et non 0 : voir le
+            // commentaire de classe.
             'events' => $this->pending(9),
             'participations' => $this->pending(10),
             'finance' => $this->financeStats($request),
 
             'generated_at' => now()->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Activité sportive du club.
+     *
+     * Contrairement aux modules non livrés, ce bloc porte de vraies mesures :
+     * il est marqué `available: true` pour que le client sache qu'un zéro
+     * signifie ici « aucune sortie », et non « pas encore mesuré ».
+     *
+     * @return array<string, mixed>
+     */
+    private function activityStats(): array
+    {
+        $row = Activity::query()
+            ->where('status', ActivityStatus::Completed)
+            ->selectRaw('
+                COUNT(*) as total,
+                COALESCE(SUM(distance_m), 0) as distance_m,
+                COALESCE(SUM(moving_time_s), 0) as moving_time_s
+            ')
+            ->first();
+
+        $thisMonth = Activity::query()
+            ->where('status', ActivityStatus::Completed)
+            ->where('started_at', '>=', now()->startOfMonth())
+            ->count();
+
+        return [
+            'available' => true,
+            'total' => (int) ($row->total ?? 0),
+            'distance_m' => (int) ($row->distance_m ?? 0),
+            'moving_time_s' => (int) ($row->moving_time_s ?? 0),
+            'this_month' => $thisMonth,
+        ];
     }
 
     /**

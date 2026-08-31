@@ -11,6 +11,7 @@ import { ActivityDetailPage } from '@/pages/activities/ActivityDetailPage'
 import { MemberDetailPage } from '@/pages/members/MemberDetailPage'
 import { MemberFormPage } from '@/pages/members/MemberFormPage'
 import { MembersPage } from '@/pages/members/MembersPage'
+import { PersonalStatsPage } from '@/pages/stats/PersonalStatsPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
@@ -30,6 +31,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 3  /members, /members/nouveau, /members/:uuid, /members/:uuid/modifier
  *   PHASE 4  /profile
  *   PHASE 7  /activities, /activities/:uuid
+ *   PHASE 8  /stats
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
@@ -39,6 +41,7 @@ const IMPLEMENTED = new Set([
   '/members',
   '/profile',
   '/activities',
+  '/stats',
 ])
 
 export default function App() {
@@ -76,6 +79,9 @@ export default function App() {
           {/* Activités — phase 7 */}
           <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/activities/:uuid" element={<ActivityDetailPage />} />
+
+          {/* Statistiques personnelles — phase 8 */}
+          <Route path="/stats" element={<PersonalStatsPage />} />
 
           {allNavItems
             .filter((item) => !IMPLEMENTED.has(item.to))

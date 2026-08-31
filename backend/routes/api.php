@@ -99,6 +99,9 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::get('/stats/dashboard', [StatsController::class, 'dashboard'])
             ->name('stats.dashboard');
 
+        // Cumuls et records personnels — PHASE 8.
+        Route::get('/stats/me', [StatsController::class, 'me'])->name('stats.me');
+
         /*
         |----------------------------------------------------------------------
         | Membres — PHASE 3

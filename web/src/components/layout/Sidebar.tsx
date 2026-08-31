@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
-import { navigation } from '@/config/navigation'
+import { isDelivered, navigation } from '@/config/navigation'
 import { canAccess, useCurrentUser } from '@/stores/auth'
 
 interface SidebarProps {
@@ -105,8 +105,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                             )}
                           />
                           <span className="flex-1 truncate">{item.label}</span>
-                          {/* Repère discret des écrans pas encore livrés. */}
-                          {item.phase > 1 && (
+                          {/* Repère discret des écrans pas encore livrés.
+                              Un écran déjà utilisable n'en porte aucun : le
+                              signaler reviendrait à le faire passer pour
+                              indisponible. */}
+                          {!isDelivered(item) && (
                             <span
                               className={clsx(
                                 'shrink-0 rounded-full px-1.5 py-px text-[0.625rem] font-bold',
@@ -114,7 +117,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                                   ? 'bg-black/15 text-[var(--cd-black)]'
                                   : 'bg-[var(--cd-surface-2)] text-[var(--cd-text-muted)]',
                               )}
-                              title={`Livré en phase ${item.phase}`}
+                              title={`À venir en phase ${item.phase}`}
                             >
                               P{item.phase}
                             </span>

@@ -119,7 +119,7 @@ final class StatsTest extends TestCase
             ->getJson('/api/v1/stats/dashboard')
             ->assertOk();
 
-        foreach (['activities' => 8, 'events' => 9, 'participations' => 10] as $key => $phase) {
+        foreach (['events' => 9, 'participations' => 10] as $key => $phase) {
             $response->assertJsonPath("data.{$key}.available", false);
             $response->assertJsonPath("data.{$key}.phase", $phase);
         }

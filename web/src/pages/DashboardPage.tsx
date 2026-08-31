@@ -23,6 +23,7 @@ import {
   YAxis,
 } from 'recharts'
 import { getData } from '@/lib/api'
+import { formatDistance, formatDurationLong, formatInteger } from '@/lib/format'
 import { fetchDashboardStats } from '@/lib/stats'
 import { useCurrentUser } from '@/stores/auth'
 import type { Health, MemberStatusCode } from '@/types/api'
@@ -106,14 +107,32 @@ export function DashboardPage() {
             icon={Bike}
             label="Activités"
             to="/activities"
-            phase={stats.data?.activities.phase}
+            value={
+              stats.data === undefined
+                ? undefined
+                : formatInteger(stats.data.activities.total)
+            }
+            hint={
+              stats.data === undefined
+                ? undefined
+                : `${formatInteger(stats.data.activities.this_month)} ce mois-ci`
+            }
             loading={stats.isLoading}
           />
           <StatTile
             icon={Route}
             label="Distance totale"
             to="/activities"
-            phase={stats.data?.activities.phase}
+            value={
+              stats.data === undefined
+                ? undefined
+                : formatDistance(stats.data.activities.distance_m)
+            }
+            hint={
+              stats.data === undefined
+                ? undefined
+                : `${formatDurationLong(stats.data.activities.moving_time_s)} en selle`
+            }
             loading={stats.isLoading}
           />
           <StatTile
@@ -340,8 +359,12 @@ interface StatTileProps {
   icon: LucideIcon
   label: string
   to: string
-  /** Valeur réelle. Absente tant que le module n'est pas livré. */
-  value?: number
+  /**
+   * Valeur réelle, déjà formatée quand elle porte une unité (« 1 240 km »).
+   * Absente tant que le module n'est pas livré — c'est ce qui déclenche
+   * l'affichage du tiret et de la phase.
+   */
+  value?: number | string
   hint?: string
   /** Phase qui livrera la valeur — affichée à la place du chiffre. */
   phase?: number

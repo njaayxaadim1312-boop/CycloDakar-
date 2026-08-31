@@ -307,9 +307,18 @@ export interface MemberStats {
   growth: { month: string; label: string; count: number }[]
 }
 
+/** Activité sportive du club — mesurée depuis la phase 6. */
+export interface ClubActivityStats {
+  available: true
+  total: number
+  distance_m: number
+  moving_time_s: number
+  this_month: number
+}
+
 export interface DashboardStats {
   members: MemberStats
-  activities: PendingModule
+  activities: ClubActivityStats
   events: PendingModule
   participations: PendingModule
   /** `visible: false` quand le club garde la caisse privée. */
@@ -436,4 +445,68 @@ export interface PointsIngestResult {
   rejection_reasons: Record<string, number>
   last_seq: number | null
   total_points: number
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cumuls et records personnels (phase 8)                                      */
+/* -------------------------------------------------------------------------- */
+
+export type StatsPeriod = 'week' | 'month' | 'year' | 'all'
+
+export interface PersonalTotals {
+  activities: number
+  distance_m: number
+  moving_time_s: number
+  duration_s: number
+  elevation_gain_m: number
+  avg_speed_mps: number
+}
+
+export interface SportBreakdown {
+  label: string
+  activities: number
+  distance_m: number
+  moving_time_s: number
+}
+
+/**
+ * Un record personnel.
+ *
+ * `null` et non zéro quand il n'existe pas : « pas encore de record » et
+ * « record de 0 km » ne veulent pas dire la même chose, et l'affichage montre
+ * un tiret dans le premier cas.
+ */
+export interface PersonalRecord {
+  value: number
+  activity_uuid: string
+  activity_title: string
+  sport: SportCode
+  achieved_at: string | null
+}
+
+export interface PersonalRecords {
+  longest_distance: PersonalRecord | null
+  longest_duration: PersonalRecord | null
+  max_speed: PersonalRecord | null
+  most_elevation: PersonalRecord | null
+  best_pace: PersonalRecord | null
+}
+
+export interface WeeklyTrendPoint {
+  week: string
+  label: string
+  distance_m: number
+  activities: number
+}
+
+export interface PersonalStats {
+  period: StatsPeriod
+  period_label: string
+  /** `null` pour la période « depuis toujours ». */
+  period_from: string | null
+  totals: PersonalTotals
+  by_sport: Record<string, SportBreakdown>
+  /** Records sur TOUTE la carrière, jamais sur la période affichée. */
+  records: PersonalRecords
+  trend: WeeklyTrendPoint[]
 }

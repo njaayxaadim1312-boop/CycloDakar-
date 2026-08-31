@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   Bike,
   CalendarDays,
   ClipboardList,
@@ -78,6 +79,14 @@ export const navigation: NavSection[] = [
         phase: 1,
         summary:
           'Historique des sorties enregistrées au GPS, avec carte, distance, durée, vitesse et dénivelé. Filtrable par sport et par période.',
+      },
+      {
+        to: '/stats',
+        label: 'Mes statistiques',
+        icon: BarChart3,
+        phase: 8,
+        summary:
+          'Vos cumuls par période, votre régularité sur douze semaines, la répartition par sport et vos records personnels.',
       },
       {
         to: '/events',
@@ -222,6 +231,22 @@ export const navigation: NavSection[] = [
     ],
   },
 ]
+
+/**
+ * Dernière phase effectivement livrée.
+ *
+ * C'est elle qui distingue « écran livré en phase 8 » de « écran à venir en
+ * phase 16 ». Sans cette borne, la pastille du menu afficherait le même repère
+ * dans les deux cas et un écran fonctionnel semblerait indisponible.
+ *
+ * À incrémenter à chaque phase terminée — voir `docs/roadmap.md`.
+ */
+export const DELIVERED_THROUGH_PHASE = 8
+
+/** L'écran correspondant à cet élément est-il déjà utilisable ? */
+export function isDelivered(item: NavItem): boolean {
+  return item.phase <= DELIVERED_THROUGH_PHASE
+}
 
 /** Tous les éléments, à plat — pratique pour retrouver la page courante. */
 export const allNavItems: NavItem[] = navigation.flatMap((section) => section.items)
