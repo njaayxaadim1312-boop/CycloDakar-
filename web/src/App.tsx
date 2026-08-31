@@ -5,6 +5,9 @@ import { allNavItems } from '@/config/navigation'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
+import { MemberDetailPage } from '@/pages/members/MemberDetailPage'
+import { MemberFormPage } from '@/pages/members/MemberFormPage'
+import { MembersPage } from '@/pages/members/MembersPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
@@ -21,10 +24,11 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  * Écrans livrés à ce jour :
  *   PHASE 1  /dashboard, /system
  *   PHASE 2  /login, /register, /forgot-password, /reset-password
+ *   PHASE 3  /members, /members/nouveau, /members/:uuid, /members/:uuid/modifier
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
-const IMPLEMENTED = new Set(['/dashboard', '/system'])
+const IMPLEMENTED = new Set(['/dashboard', '/system', '/members'])
 
 export default function App() {
   return (
@@ -49,6 +53,13 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/system" element={<SystemStatusPage />} />
+
+          {/* Membres — phase 3. « nouveau » est déclaré AVANT « :uuid »
+              pour ne pas être pris pour un identifiant. */}
+          <Route path="/members" element={<MembersPage />} />
+          <Route path="/members/nouveau" element={<MemberFormPage />} />
+          <Route path="/members/:uuid" element={<MemberDetailPage />} />
+          <Route path="/members/:uuid/modifier" element={<MemberFormPage />} />
 
           {allNavItems
             .filter((item) => !IMPLEMENTED.has(item.to))

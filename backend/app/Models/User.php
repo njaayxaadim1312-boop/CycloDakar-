@@ -11,6 +11,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -56,6 +57,24 @@ class User extends Authenticatable
         static::creating(function (self $user): void {
             $user->uuid ??= (string) Str::uuid();
         });
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Relations                                                              */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Fiche club associée.
+     *
+     * Peut être absente : un compte peut exister avant sa fiche (inscription
+     * en deux temps). L'inverse est plus fréquent encore — un membre sans
+     * smartphone a une fiche mais pas de compte.
+     *
+     * @return HasOne<Member, $this>
+     */
+    public function member(): HasOne
+    {
+        return $this->hasOne(Member::class);
     }
 
     /* ---------------------------------------------------------------------- */

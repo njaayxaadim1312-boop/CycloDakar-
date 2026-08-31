@@ -46,10 +46,16 @@ Index : `email`, `phone`, `role`.
 ### `members`
 Fiche club.
 
+> **Révision (phase 3).** `user_id` est devenu **facultatif**. Un adhérent sans
+> smartphone n'a pas de compte de connexion, et doit pourtant avoir un matricule,
+> un QR Code et une place dans les collectes. Le compte peut lui être rattaché
+> plus tard sans rien recréer.
+
 | Colonne | Type | Notes |
 |---|---|---|
 | id | BIGINT PK | |
-| user_id | BIGINT FK → users UNIQUE | |
+| uuid | CHAR(36) UNIQUE | identifiant public |
+| user_id | BIGINT FK → users UNIQUE **NULL** | facultatif — voir ci-dessus |
 | matricule | VARCHAR(12) UNIQUE | `CD-000001`, généré en transaction verrouillée |
 | first_name, last_name | VARCHAR(80) | |
 | phone | VARCHAR(20) | |
@@ -59,14 +65,22 @@ Fiche club.
 | gender | VARCHAR(10) NULL | |
 | joined_at | DATE | date d'adhésion |
 | status | VARCHAR(20) | `ACTIVE` \| `SUSPENDED` \| `FORMER` \| `PENDING` |
-| qr_token | CHAR(43) UNIQUE | **jeton opaque aléatoire**, aucune donnée personnelle |
+| qr_token | CHAR(43) UNIQUE | **jeton opaque aléatoire** (32 octets, base64 URL), aucune donnée personnelle |
 | qr_rotated_at | TIMESTAMP NULL | permet de révoquer un QR compromis |
-| emergency_contact | VARCHAR(120) NULL | |
+| emergency_contact_name | VARCHAR(120) NULL | |
+| emergency_contact_phone | VARCHAR(20) NULL | |
 | notes | TEXT NULL | |
 | timestamps, deleted_at | | |
 
-Index : `matricule`, `qr_token`, `status`, `last_name`, index composite recherche
-`(last_name, first_name)`.
+Index : `matricule`, `qr_token`, `phone`, `status`, `last_name`, `joined_at`, et un
+index composite `(last_name, first_name)` qui couvre le tri alphabétique de
+l'annuaire.
+
+**Matricule** : `CD-000001`, généré sous `SELECT ... FOR UPDATE` dans la
+transaction de création (voir `App\Services\MatriculeGenerator`). Deux
+inscriptions simultanées sont sérialisées ; la contrainte `UNIQUE` reste le
+dernier rempart. Un matricule n'est **jamais réattribué**, même après le départ
+d'un membre : les listes papier et les archives du club y font référence.
 
 ### `roles`, `permissions`, `permission_role`, `role_user`
 Structure RBAC fine. Créées dès la phase 1, exploitées à partir de la phase 3.
@@ -363,6 +377,11 @@ Classements figés par période (évite de rebalayer `activities` à chaque affi
 Table standard Laravel (`id CHAR(36)`, `type`, `notifiable_*`, `data JSON`, `read_at`).
 
 ### `audit_logs`
+
+> Créée dès la **phase 3** : l'attribution d'un rôle donne accès à la caisse et
+> doit pouvoir s'expliquer six mois plus tard en assemblée générale. La table est
+> dimensionnée pour ce qu'exigera le module financier (phase 13) ; sa consultation
+> depuis l'interface arrive en phase 19.
 
 | Colonne | Type |
 |---|---|

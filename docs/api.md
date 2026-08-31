@@ -82,7 +82,7 @@ Authorization: Bearer <token Sanctum>
 | `password-reset` | 5/h par IP | **demande** de réinitialisation |
 | `password-reset-confirm` | 15/h par IP | **usage** du lien reçu (compteur distinct) |
 | `gps-sync` | 240/min | ingestion de points |
-| `qr-scan` | 60/min | scan de QR sur le terrain |
+| `qr-scan` | 60/min | recherche terrain et scan de QR |
 
 ### Unités — règle absolue
 
@@ -99,7 +99,7 @@ La conversion en km, km/h, min/km et en heure de Dakar se fait **côté client**
 
 ---
 
-## 2. Routes livrées (phases 1 et 2)
+## 2. Routes livrées (phases 1 à 3)
 
 ### `GET /health` — public
 
@@ -250,7 +250,116 @@ le geste à faire quand on perd son téléphone.
 Le mot de passe actuel est exigé même si la session est valide : un téléphone laissé
 déverrouillé ne doit pas suffire à verrouiller le compte de son propriétaire.
 
-### Contrôle par rôle
+---
+
+## 3. Membres — phase 3
+
+Les fiches sont adressées par leur `uuid`, jamais par l'identifiant
+auto-incrémenté : sinon on pourrait énumérer les fiches et connaître l'effectif.
+
+### `GET /members` — annuaire paginé
+
+```
+?search=Kha&status=ACTIVE&role=COLLECTOR&has_account=0&sort=name&per_page=20&page=2
+```
+
+| Paramètre | Valeurs |
+|---|---|
+| `search` | prénom, nom, matricule (`CD-000042` ou `42`), téléphone (toute forme), email |
+| `status` | `ACTIVE` · `PENDING` · `SUSPENDED` · `FORMER` |
+| `role` | rôle du compte associé |
+| `has_account` | `1` avec compte, `0` sans compte (membres sans smartphone) |
+| `sort` | `name` (défaut) · `matricule` · `recent` · `seniority` |
+| `per_page` | 5 à 100, défaut 20 |
+
+Tout membre connecté peut consulter l'annuaire : c'est un club sportif, et le
+collecteur doit pouvoir retrouver n'importe qui.
+
+### `GET /members/search?q=Kha&limit=10` — recherche terrain
+
+Réponse volontairement allégée (`uuid`, `matricule`, `full_name`, `initials`,
+`phone_formatted`, `photo_url`, `status`) et **non paginée** : le collecteur tape
+trois lettres et choisit dans une courte liste, souvent sur un réseau médiocre.
+
+Les membres `FORMER` en sont exclus — un ancien membre n'a pas à polluer une
+collecte en cours.
+
+C'est cette route qui remplace la saisie manuelle des noms.
+
+### `GET /members/{uuid}` · `GET /members/me`
+
+Le **serveur** décide de ce qu'il expose, selon qui regarde :
+
+| Champ | Visible par |
+|---|---|
+| nom, matricule, photo, statut, ancienneté | tout membre connecté |
+| `phone`, `email`, `account` | l'intéressé, les collecteurs et au-dessus |
+| `birth_date`, contact d'urgence, `qr_token` | l'intéressé et les administrateurs |
+| `notes` | les administrateurs |
+
+Un champ **absent** signifie « pas le droit de voir » ; un champ **`null`**
+signifie « non renseigné ». Le filtrage n'est jamais délégué au client.
+
+`permissions` indique ce que le visiteur peut faire sur cette fiche — pour
+masquer les boutons inutiles, jamais pour autoriser.
+
+### `POST /members` — création
+
+`multipart/form-data` (à cause de la photo). Réservé aux collecteurs et au-dessus :
+c'est le cas « un nouveau se présente au départ d'une sortie ».
+
+Le **matricule** (`CD-000001`, généré sous verrou d'écriture) et le **jeton QR**
+sont posés par le serveur. Un client qui les enverrait les verrait ignorés.
+
+Le membre créé n'a **pas** de compte de connexion — c'est normal, tous les
+adhérents n'ont pas de smartphone.
+
+### `POST /members/{uuid}` — modification
+
+`POST` et non `PATCH` : ni les navigateurs ni React Native n'envoient de fichier
+en multipart sur une requête `PATCH`.
+
+Un membre modifie sa propre fiche ; un administrateur, n'importe laquelle.
+Le champ `status` n'est accepté que d'un administrateur — sinon un membre
+suspendu se réactiverait lui-même.
+
+### `POST /members/{uuid}/role` — attribution d'un rôle
+
+```json
+{ "role": "TREASURER", "reason": "Élu trésorier en assemblée générale" }
+```
+
+L'opération la plus sensible du module : elle ouvre l'accès à la caisse.
+
+| Règle | Effet |
+|---|---|
+| Réservé aux administrateurs | `403` sinon |
+| On ne modifie pas son propre rôle | `403` |
+| Seul un `SUPER_ADMIN` touche à un administrateur | `403` sinon |
+| On ne nomme pas plus haut que soi | `422` |
+| Membre sans compte | `422` `MEMBER_HAS_NO_ACCOUNT` |
+
+Effets systématiques : écriture dans `audit_logs` (auteur, avant/après, motif)
+et **révocation de toutes les sessions** du membre — les jetons émis portaient
+les capacités de l'ancien rôle, et une rétrogradation doit prendre effet
+immédiatement.
+
+### `POST /members/{uuid}/rotate-qr`
+
+Révoque le QR Code et en émet un nouveau. Accessible à l'intéressé et aux
+administrateurs. À utiliser si un membre pense que son QR a été copié.
+
+### `DELETE /members/{uuid}` — archivage
+
+Suppression **douce** uniquement : les activités et les paiements du membre y
+font référence. Le compte associé est désactivé et ses jetons révoqués, mais il
+n'est pas supprimé — ses écritures financières doivent rester rattachées.
+
+Dans la plupart des cas, passer le statut à `FORMER` est le geste juste.
+
+---
+
+## 4. Contrôle par rôle
 
 Le middleware `role:` raisonne en **rôle minimum** :
 
@@ -267,23 +376,9 @@ jeton présenté est révoqué au passage.
 
 ---
 
-## 4. Routes à venir, par phase
+## 5. Routes à venir, par phase
 
 
-
-### Phase 3 — Membres
-
-```http
-GET    /members?search=&status=&role=&page=
-GET    /members/{id}
-POST   /members
-PATCH  /members/{id}
-GET    /members/{id}/qr             → SVG du QR Code
-POST   /members/{id}/rotate-qr      → révoque l'ancien jeton
-```
-
-La recherche accepte nom, prénom, téléphone ou matricule — c'est elle qui remplace
-la saisie manuelle des noms lors des collectes.
 
 ### Phase 6 — Activités et GPS
 
@@ -391,7 +486,7 @@ PATCH  /settings
 
 ---
 
-## 5. Documentation interactive
+## 6. Documentation interactive
 
 À partir de la **phase 19**, un schéma **OpenAPI 3.1** est généré et servi sur
 `/api/documentation` (Swagger UI). D'ici là, ce document fait foi.

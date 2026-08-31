@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\MemberController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -85,14 +86,48 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         /*
         |----------------------------------------------------------------------
-        | Exemples de routes protégées par rôle (à décommenter avec le module)
+        | Membres — PHASE 3
+        |----------------------------------------------------------------------
+        |
+        | Les fiches sont adressées par leur `uuid`, jamais par l'identifiant
+        | auto-incrémenté : sinon on pourrait énumérer les fiches et connaître
+        | l'effectif du club. Les autorisations sont portées par MemberPolicy.
+        |
+        */
+        Route::prefix('members')->name('members.')->group(function (): void {
+            // Fiche club du compte connecté. Déclarée AVANT /{member} pour que
+            // « me » ne soit pas pris pour un uuid.
+            Route::get('/me', [MemberController::class, 'me'])->name('me');
+
+            // Recherche rapide pour la collecte sur le terrain : charge utile
+            // réduite, limite basse. C'est elle qui remplace la saisie
+            // manuelle des noms.
+            Route::get('/search', [MemberController::class, 'search'])
+                ->middleware('throttle:qr-scan')
+                ->name('search');
+
+            Route::get('/', [MemberController::class, 'index'])->name('index');
+            Route::post('/', [MemberController::class, 'store'])->name('store');
+
+            Route::get('/{member}', [MemberController::class, 'show'])->name('show');
+            // POST plutôt que PATCH : les navigateurs et React Native
+            // n'envoient pas de fichier en multipart sur une requête PATCH.
+            Route::post('/{member}', [MemberController::class, 'update'])->name('update');
+            Route::delete('/{member}', [MemberController::class, 'destroy'])->name('destroy');
+
+            Route::post('/{member}/role', [MemberController::class, 'updateRole'])->name('role');
+            Route::post('/{member}/rotate-qr', [MemberController::class, 'rotateQrCode'])->name('rotate-qr');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Modules à venir
         |----------------------------------------------------------------------
         |
         | Route::middleware('role:COLLECTOR')->group(...)   PHASE 12
         | Route::middleware('role:TREASURER')->group(...)   PHASE 13
         | Route::middleware('role:ADMIN')->group(...)       PHASE 19
         |
-        | PHASE 3  — /members, /members/{uuid}, /members/search
         | PHASE 6  — /activities, /activities/{uuid}/points, /finalize
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations

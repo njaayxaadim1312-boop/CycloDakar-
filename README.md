@@ -189,6 +189,9 @@ Créés par `php artisan migrate --seed` (mot de passe : `CycloDakar2026!`) :
 | Trésorier | `tresorier@cyclodakar.sn` | 77 000 00 02 |
 | Membre | `membre@cyclodakar.sn` | 77 000 00 03 |
 
+Le seeder crée aussi **6 membres sans compte de connexion** (les adhérents sans
+smartphone) : matricule, QR Code et place dans l'effectif, mais pas de connexion.
+
 La connexion accepte **l'email ou le téléphone**, dans n'importe quel format.
 Changez le mot de passe de l'administrateur dès la première connexion.
 
@@ -239,7 +242,7 @@ CycloDakar/
 |---|---|---|
 | 1 | Initialisation, structure, environnement | ✅ **Terminée** |
 | 2 | Authentification | ✅ **Terminée** |
-| 3 | Membres, matricules, QR Code | ⏳ à venir |
+| 3 | Membres, matricules et rôles | ✅ **Terminée** |
 | 4–5 | Interfaces web et mobile | ⏳ |
 | 6–8 | GPS, carte, statistiques, historique | ⏳ |
 | 9–12 | Événements, participations, paiements | ⏳ |

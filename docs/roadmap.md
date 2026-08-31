@@ -61,11 +61,38 @@ identité visuelle, documentation d'architecture.
 
 ---
 
-## ⏳ Phase 3 — Membres, rôles et permissions
+## ✅ Phase 3 — Membres, matricules et rôles *(terminée)*
 
-Modèle `members`, matricule automatique `CD-000001` généré sous verrou, photo,
-statuts, recherche multi-critères (nom, prénom, téléphone, matricule), tables RBAC,
-Policies Laravel, CRUD web.
+**Backend**
+
+- Table `members` : matricule `CD-000001` généré **sous verrou d'écriture**,
+  jamais réattribué ; photo, statuts, contact d'urgence, jeton QR.
+- `user_id` **facultatif** : un adhérent sans smartphone a une fiche, un
+  matricule et un QR Code, sans compte de connexion.
+- Jeton QR opaque de 43 caractères, sans aucune donnée personnelle, révocable.
+- Recherche en une saisie : prénom, nom, nom complet dans les deux sens,
+  matricule (`CD-000042` ou `42`), téléphone sous toutes ses formes, email.
+- Deux routes distinctes : l'annuaire paginé et filtrable, et une recherche
+  terrain allégée pour la collecte.
+- `MemberPolicy` : chacun gère sa fiche, l'administration gère les autres ;
+  le statut et le rôle échappent au membre concerné.
+- Filtrage des champs **côté serveur** selon le lecteur (coordonnées, notes,
+  jeton QR) — jamais délégué au client.
+- Attribution de rôle avec quatre garde-fous, trace d'audit obligatoire et
+  révocation immédiate des sessions.
+- Table `audit_logs` et service `AuditLogger` (socle du module financier).
+- L'inscription crée désormais le compte **et** sa fiche club.
+- Traductions françaises complètes de la validation.
+
+**Web**
+
+- Annuaire : recherche différée, filtres dans l'URL, pagination, avatars à
+  initiales colorées, étiquettes de statut et de rôle.
+- Fiche membre : identité, coordonnées, rôle, QR Code, permissions.
+- Formulaire de création et de modification avec photo.
+- Attribution de rôle avec motif, depuis la fiche.
+
+**Tests** — 118 tests, 377 assertions, tous au vert.
 
 ---
 

@@ -11,6 +11,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\MemberService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,8 +28,16 @@ use Illuminate\Support\Facades\Hash;
  */
 final class AuthController extends Controller
 {
+    public function __construct(
+        private readonly MemberService $members,
+    ) {}
+
     /**
      * Inscription.
+     *
+     * Crée le compte de connexion ET sa fiche club dans la même transaction :
+     * dans ce club, s'inscrire c'est devenir membre. Un compte sans fiche
+     * n'aurait ni matricule ni QR Code, et resterait invisible des collectes.
      *
      * Le compte créé est TOUJOURS un simple membre. Le rôle n'est pas lu dans
      * la requête : il est imposé ici.
@@ -41,6 +50,8 @@ final class AuthController extends Controller
             $user->role = UserRole::Member;
             $user->is_active = true;
             $user->save();
+
+            $this->members->createForUser($user);
 
             return $user;
         });

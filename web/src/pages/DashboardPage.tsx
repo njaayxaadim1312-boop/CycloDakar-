@@ -127,7 +127,7 @@ export function DashboardPage() {
           <ol className="mt-4 space-y-2.5">
             <PhaseRow n={1} label="Initialisation, structure, environnement" done />
             <PhaseRow n={2} label="Authentification" done />
-            <PhaseRow n={3} label="Membres, rôles et QR Code" />
+            <PhaseRow n={3} label="Membres, rôles et QR Code" done />
             <PhaseRow n={6} label="GPS et enregistrement des sorties" />
             <PhaseRow n={12} label="Paiements et encaissements" />
             <PhaseRow n={13} label="Recettes, dépenses et caisse" />

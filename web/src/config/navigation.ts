@@ -111,7 +111,7 @@ export const navigation: NavSection[] = [
         to: '/members',
         label: 'Membres',
         icon: Users,
-        phase: 3,
+        phase: 1,
         summary:
           'Annuaire du club : matricule automatique, photo, statut, QR Code personnel et recherche par nom, téléphone ou matricule.',
       },
