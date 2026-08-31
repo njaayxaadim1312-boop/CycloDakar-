@@ -11,6 +11,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  UserRound,
   Trophy,
   Users,
   Wallet,
@@ -173,6 +174,19 @@ export const navigation: NavSection[] = [
         roles: FINANCE,
         summary:
           'Rapports par jour, semaine, mois, année ou période libre, avec ventilation par catégorie et export PDF, Excel ou CSV.',
+      },
+    ],
+  },
+  {
+    title: 'Mon espace',
+    items: [
+      {
+        to: '/profile',
+        label: 'Mon compte',
+        icon: UserRound,
+        phase: 1,
+        summary:
+          "Votre fiche club, votre mot de passe, votre QR Code et vos préférences d'affichage.",
       },
     ],
   },

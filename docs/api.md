@@ -99,7 +99,7 @@ La conversion en km, km/h, min/km et en heure de Dakar se fait **côté client**
 
 ---
 
-## 2. Routes livrées (phases 1 à 3)
+## 2. Routes livrées (phases 1 à 4)
 
 ### `GET /health` — public
 
@@ -249,6 +249,45 @@ le geste à faire quand on perd son téléphone.
 
 Le mot de passe actuel est exigé même si la session est valide : un téléphone laissé
 déverrouillé ne doit pas suffire à verrouiller le compte de son propriétaire.
+
+### `GET /stats/dashboard` — authentifié · phase 4
+
+Statistiques du tableau de bord.
+
+```json
+{
+  "data": {
+    "members": {
+      "total": 12, "active": 9,
+      "by_status": { "ACTIVE": { "label": "Actif", "count": 9 }, "…": {} },
+      "by_role":   { "TREASURER": { "label": "Trésorier", "count": 1 }, "…": {} },
+      "with_account": 5, "without_account": 7,
+      "joined_this_month": 6,
+      "growth": [{ "month": "2026-08", "label": "août 26", "count": 6 }]
+    },
+    "activities":     { "available": false, "phase": 8 },
+    "events":         { "available": false, "phase": 9 },
+    "participations": { "available": false, "phase": 10 },
+    "finance":        { "visible": true, "available": false, "phase": 13 },
+    "generated_at": "2026-08-31T16:00:00+00:00"
+  }
+}
+```
+
+Trois règles gouvernent cette route :
+
+1. **Aucun chiffre inventé.** Un module non livré renvoie `available: false` avec
+   sa phase, jamais un `0`. « Aucune activité » et « module pas encore livré » ne
+   veulent pas dire la même chose — et sur un tableau de bord qui affichera un
+   solde de caisse, la confusion serait grave.
+2. **Tous les statuts et rôles sont présents, même à zéro.** Un statut absent
+   disparaîtrait de l'affichage et semblerait ne pas exister.
+3. **La caisse est masquée** (`finance.visible: false`) aux membres ordinaires,
+   sauf si le club a choisi la transparence
+   (`settings.public_balance`).
+
+La courbe couvre douze mois pleins, mois creux inclus : les sauter donnerait une
+fausse impression de croissance continue.
 
 ---
 

@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { allNavItems } from '@/config/navigation'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { ProfilePage } from '@/pages/ProfilePage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
 import { MemberDetailPage } from '@/pages/members/MemberDetailPage'
 import { MemberFormPage } from '@/pages/members/MemberFormPage'
@@ -25,10 +26,11 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 1  /dashboard, /system
  *   PHASE 2  /login, /register, /forgot-password, /reset-password
  *   PHASE 3  /members, /members/nouveau, /members/:uuid, /members/:uuid/modifier
+ *   PHASE 4  /profile
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
-const IMPLEMENTED = new Set(['/dashboard', '/system', '/members'])
+const IMPLEMENTED = new Set(['/dashboard', '/system', '/members', '/profile'])
 
 export default function App() {
   return (
@@ -53,6 +55,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/system" element={<SystemStatusPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
 
           {/* Membres — phase 3. « nouveau » est déclaré AVANT « :uuid »
               pour ne pas être pris pour un identifiant. */}

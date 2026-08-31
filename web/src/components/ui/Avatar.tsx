@@ -2,7 +2,11 @@ import clsx from 'clsx'
 
 interface AvatarProps {
   photoUrl?: string | null
-  initials: string
+  /**
+   * Initiales du membre. Tolérées absentes : l'API les fournit toujours, mais
+   * un avatar ne doit jamais pouvoir faire écran blanc à la page entière.
+   */
+  initials?: string | null
   size?: number
   className?: string
 }
@@ -18,6 +22,8 @@ interface AvatarProps {
  * toujours la même couleur, ce qui aide à la repérer dans une liste.
  */
 export function Avatar({ photoUrl, initials, size = 40, className }: AvatarProps) {
+  const letters = (initials ?? '').trim().slice(0, 2).toUpperCase() || '?'
+
   if (photoUrl) {
     return (
       <img
@@ -43,11 +49,11 @@ export function Avatar({ photoUrl, initials, size = 40, className }: AvatarProps
         width: size,
         height: size,
         fontSize: Math.round(size * 0.38),
-        backgroundColor: colorFor(initials),
+        backgroundColor: colorFor(letters),
         color: '#1a1a1a',
       }}
     >
-      {initials}
+      {letters}
     </span>
   )
 }

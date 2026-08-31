@@ -243,7 +243,8 @@ CycloDakar/
 | 1 | Initialisation, structure, environnement | ✅ **Terminée** |
 | 2 | Authentification | ✅ **Terminée** |
 | 3 | Membres, matricules et rôles | ✅ **Terminée** |
-| 4–5 | Interfaces web et mobile | ⏳ |
+| 4 | Interface web | ✅ **Terminée** |
+| 5 | Interface mobile | ⏳ à venir |
 | 6–8 | GPS, carte, statistiques, historique | ⏳ |
 | 9–12 | Événements, participations, paiements | ⏳ |
 | 13–14 | Caisse et rapports financiers | ⏳ |

@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { ChevronDown, LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth, useCurrentUser } from '@/stores/auth'
 
@@ -129,6 +129,16 @@ function AccountMenu() {
           </div>
 
           <div className="p-1.5">
+            <Link
+              to="/profile"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2.5 rounded-[var(--cd-radius-sm)] px-3 py-2 text-left text-sm font-medium hover:bg-[var(--cd-surface-2)]"
+            >
+              <UserRound size={16} className="text-[var(--cd-text-muted)]" />
+              Mon compte
+            </Link>
+
             <button
               type="button"
               role="menuitem"

@@ -96,10 +96,42 @@ identité visuelle, documentation d'architecture.
 
 ---
 
-## ⏳ Phase 4 — Interface web
+## ✅ Phase 4 — Interface web *(terminée)*
 
-Coquille applicative (barre latérale, en-tête, navigation par rôle), tableau de bord
-administrateur, composants réutilisables, responsive complet, mode sombre.
+La coquille applicative (menu latéral orange et blanc, en-tête, navigation
+filtrée par rôle, responsive, thème clair/sombre) avait été livrée par anticipation
+juste après la phase 1. Cette phase a donc porté sur ce qui manquait réellement.
+
+**Tableau de bord avec des données réelles**
+
+- `GET /stats/dashboard` : effectifs par statut et par rôle, membres avec et sans
+  compte, adhésions du mois, courbe sur douze mois.
+- Les modules à venir renvoient `available: false` avec leur phase — **jamais un
+  zéro**. Sur un tableau de bord qui affichera un solde de caisse, confondre
+  « rien » et « pas encore mesuré » ruinerait la confiance du bureau.
+- La tuile « Solde de caisse » n'apparaît qu'au trésorier et au-dessus, sauf si
+  le club a choisi la transparence.
+- Graphique des adhésions (recharts), mois creux inclus.
+
+**Écran « Mon compte »**
+
+Ces actions existaient dans l'API depuis la phase 2 mais n'avaient **aucun point
+d'entrée dans l'interface** : un membre ne pouvait pas changer son mot de passe
+autrement qu'en passant par « mot de passe oublié ».
+
+- Fiche club personnelle, changement de mot de passe (avec option de déconnexion
+  des autres appareils), rotation du QR Code, choix du thème, déconnexion globale.
+
+**Fiabilité**
+
+- Les tests tournent désormais sur **MySQL** et non plus SQLite : `SELECT … FOR
+  UPDATE` (génération des matricules, et bientôt le solde de caisse) était
+  purement ignoré par SQLite, et les fonctions de date divergentes masquaient des
+  requêtes invalides en production.
+- `Avatar` ne peut plus faire écran blanc si les initiales manquent.
+
+**Tests** — 128 tests, 412 assertions, tous au vert. Rendu headless vérifié sur
+16 combinaisons (4 rôles × 4 écrans).
 
 ---
 

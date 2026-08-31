@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemberController;
+use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -83,6 +84,19 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
         Route::post('/auth/change-password', [AuthController::class, 'changePassword'])
             ->name('auth.change-password');
+
+        /*
+        |----------------------------------------------------------------------
+        | Tableau de bord — PHASE 4
+        |----------------------------------------------------------------------
+        |
+        | Ne renvoie que ce qui est reellement mesurable : les modules non
+        | livres repondent `available: false` avec leur phase, jamais un zero
+        | qui laisserait croire a une valeur reelle.
+        |
+        */
+        Route::get('/stats/dashboard', [StatsController::class, 'dashboard'])
+            ->name('stats.dashboard');
 
         /*
         |----------------------------------------------------------------------

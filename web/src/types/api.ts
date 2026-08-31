@@ -274,3 +274,45 @@ export interface Paginated<T> {
     has_more: boolean
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Tableau de bord (phase 4)                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bloc d'un module pas encore livré.
+ *
+ * `available: false` et non un zéro : « aucune activité » et « module pas
+ * encore livré » ne veulent pas dire la même chose, et sur un tableau de bord
+ * qui affichera un solde de caisse, confondre les deux ruinerait la confiance.
+ */
+export interface PendingModule {
+  available: false
+  phase: number
+}
+
+export interface CountedLabel {
+  label: string
+  count: number
+}
+
+export interface MemberStats {
+  total: number
+  active: number
+  by_status: Record<MemberStatusCode, CountedLabel>
+  by_role: Record<RoleCode, CountedLabel>
+  with_account: number
+  without_account: number
+  joined_this_month: number
+  growth: { month: string; label: string; count: number }[]
+}
+
+export interface DashboardStats {
+  members: MemberStats
+  activities: PendingModule
+  events: PendingModule
+  participations: PendingModule
+  /** `visible: false` quand le club garde la caisse privée. */
+  finance: { visible: boolean; available?: false; phase?: number }
+  generated_at: string
+}

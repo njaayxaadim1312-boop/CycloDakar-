@@ -4,26 +4,45 @@ import {
   CalendarDays,
   CircleAlert,
   CircleCheck,
+  Clock,
   Route,
+  SmartphoneNfc,
+  UserPlus,
   Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { getData } from '@/lib/api'
+import { fetchDashboardStats } from '@/lib/stats'
 import { useCurrentUser } from '@/stores/auth'
-import type { Health } from '@/types/api'
+import type { Health, MemberStatusCode } from '@/types/api'
 
 /**
  * Tableau de bord du club.
  *
- * Les indicateurs affichent « — » tant que les modules qui les alimentent ne
- * sont pas livrés. C'est délibéré : afficher des chiffres inventés sur un
- * tableau de bord financier serait le plus sûr moyen de perdre la confiance du
- * bureau. Chaque tuile annonce la phase qui lui donnera sa valeur.
+ * Règle qui gouverne cet écran : **on n'affiche jamais un chiffre inventé**.
+ * Les effectifs sont réels ; les modules à venir portent explicitement la
+ * mention de leur phase et un tiret, jamais un zéro. Sur un tableau de bord
+ * qui affichera un jour un solde de caisse, confondre « rien » et « pas encore
+ * mesuré » suffirait à ruiner la confiance du bureau.
  */
 export function DashboardPage() {
   const user = useCurrentUser()
+
+  const stats = useQuery({
+    queryKey: ['stats', 'dashboard'],
+    queryFn: fetchDashboardStats,
+  })
 
   const health = useQuery({
     queryKey: ['health'],
@@ -32,6 +51,7 @@ export function DashboardPage() {
     refetchInterval: 60_000,
   })
 
+  const members = stats.data?.members
   const serverUp = health.isSuccess && health.data.status === 'healthy'
 
   return (
@@ -42,12 +62,11 @@ export function DashboardPage() {
           Saison 2026 · {user?.role_label}
         </p>
         <h2 className="mt-1 text-2xl text-[var(--cd-black)] sm:text-3xl">
-          {/* Le prenom seul : plus chaleureux, et plus court sur mobile. */}
+          {/* Le prénom seul : plus chaleureux, et plus court sur mobile. */}
           Bonjour {user?.name.split(' ')[0] ?? ''}
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-black/75">
           Sorties GPS, événements, participations et caisse réunis au même endroit.
-          La base technique est en place ; les modules arrivent phase par phase.
         </p>
       </section>
 
@@ -56,18 +75,192 @@ export function DashboardPage() {
         <h3 className="mb-3 text-sm font-bold tracking-wide text-[var(--cd-text-muted)] uppercase">
           Indicateurs du club
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatTile icon={Users} label="Membres" phase={3} to="/members" />
-          <StatTile icon={Bike} label="Activités" phase={8} to="/activities" />
-          <StatTile icon={Route} label="Distance totale" phase={8} to="/activities" />
-          <StatTile icon={CalendarDays} label="Événements" phase={9} to="/events" />
-          <StatTile icon={Wallet} label="Solde de caisse" phase={13} to="/finance" accent />
-          <StatTile icon={Wallet} label="Reste à collecter" phase={12} to="/participations" />
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile
+            icon={Users}
+            label="Membres actifs"
+            to="/members?status=ACTIVE"
+            value={members?.active}
+            hint={members ? `${members.total} au total, tous statuts` : undefined}
+            loading={stats.isLoading}
+            accent
+          />
+          <StatTile
+            icon={UserPlus}
+            label="Adhésions ce mois-ci"
+            to="/members?sort=recent"
+            value={members?.joined_this_month}
+            hint="Depuis le 1er du mois"
+            loading={stats.isLoading}
+          />
+          <StatTile
+            icon={SmartphoneNfc}
+            label="Membres sans compte"
+            to="/members?has_account=0"
+            value={members?.without_account}
+            hint="QR Code à remettre imprimé"
+            loading={stats.isLoading}
+          />
+          <StatTile
+            icon={Bike}
+            label="Activités"
+            to="/activities"
+            phase={stats.data?.activities.phase}
+            loading={stats.isLoading}
+          />
+          <StatTile
+            icon={Route}
+            label="Distance totale"
+            to="/activities"
+            phase={stats.data?.activities.phase}
+            loading={stats.isLoading}
+          />
+          <StatTile
+            icon={CalendarDays}
+            label="Événements"
+            to="/events"
+            phase={stats.data?.events.phase}
+            loading={stats.isLoading}
+          />
+          {stats.data?.finance.visible && (
+            <StatTile
+              icon={Wallet}
+              label="Solde de caisse"
+              to="/finance"
+              phase={stats.data.finance.phase}
+              loading={stats.isLoading}
+            />
+          )}
+          <StatTile
+            icon={Wallet}
+            label="Reste à collecter"
+            to="/participations"
+            phase={stats.data?.participations.phase}
+            loading={stats.isLoading}
+          />
         </div>
       </section>
 
-      {/* --- État des services + avancement -------------------------------- */}
-      <section className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+      {/* --- Répartitions -------------------------------------------------- */}
+      {members && (
+        <section className="grid gap-4 lg:grid-cols-2">
+          <article className="cd-card p-5">
+            <h3 className="text-base font-bold">Effectif par statut</h3>
+            <ul className="mt-4 space-y-3">
+              {(
+                Object.entries(members.by_status) as [
+                  MemberStatusCode,
+                  { label: string; count: number },
+                ][]
+              ).map(([code, entry]) => (
+                <li key={code}>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium">{entry.label}</span>
+                    <span className="tabular font-bold">{entry.count}</span>
+                  </div>
+                  {/* Barre décorative : le chiffre est écrit juste à côté, elle
+                      n'est donc pas seule porteuse de l'information. */}
+                  <div
+                    className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--cd-surface-2)]"
+                    role="presentation"
+                  >
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500"
+                      style={{
+                        width: `${members.total > 0 ? (entry.count / members.total) * 100 : 0}%`,
+                        backgroundColor: STATUS_COLOR[code],
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </article>
+
+          <article className="cd-card p-5">
+            <h3 className="text-base font-bold">Adhésions sur 12 mois</h3>
+            <p className="mt-1 text-sm text-[var(--cd-text-muted)]">
+              Les mois sans adhésion sont affichés à zéro, pas masqués.
+            </p>
+
+            <div className="mt-4 h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={members.growth}
+                  margin={{ top: 4, right: 4, bottom: 0, left: -24 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="var(--cd-border)"
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: 'var(--cd-text-muted)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: 'var(--cd-text-muted)' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'var(--cd-orange-soft)' }}
+                    contentStyle={{
+                      backgroundColor: 'var(--cd-surface)',
+                      border: '1px solid var(--cd-border)',
+                      borderRadius: 'var(--cd-radius-sm)',
+                      fontSize: 13,
+                    }}
+                    labelStyle={{ color: 'var(--cd-text)', fontWeight: 600 }}
+                    formatter={(value) => [
+                      `${value} adhésion${Number(value) > 1 ? 's' : ''}`,
+                      '',
+                    ]}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--cd-orange)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={28}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+        </section>
+      )}
+
+      {/* --- Rôles + état des services ------------------------------------- */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        {members && (
+          <article className="cd-card p-5">
+            <h3 className="text-base font-bold">Rôles attribués</h3>
+            <p className="mt-1 text-sm text-[var(--cd-text-muted)]">
+              {members.with_account} membre{members.with_account > 1 ? 's' : ''} avec
+              un compte de connexion, {members.without_account} sans.
+            </p>
+            <dl className="mt-4 space-y-2 text-sm">
+              {Object.entries(members.by_role).map(([code, entry]) => (
+                <div key={code} className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[var(--cd-text-muted)]">{entry.label}</dt>
+                  <dd className="tabular font-semibold">{entry.count}</dd>
+                </div>
+              ))}
+            </dl>
+            <Link
+              to="/members"
+              className="mt-4 inline-block text-sm font-semibold text-brand-text hover:underline"
+            >
+              Voir l'annuaire →
+            </Link>
+          </article>
+        )}
+
         <article className="cd-card p-5">
           <h3 className="text-base font-bold">État des services</h3>
 
@@ -105,33 +298,29 @@ export function DashboardPage() {
 
           {health.isError && (
             <p className="mt-3 rounded-[var(--cd-radius-sm)] bg-[var(--cd-danger-soft)] p-3 text-sm text-[var(--cd-danger)]">
-              API injoignable. Lancez <code>php artisan serve</code> dans <code>backend/</code>.
+              API injoignable. Lancez <code>php artisan serve</code> dans{' '}
+              <code>backend/</code>.
+            </p>
+          )}
+
+          {stats.data && (
+            <p className="mt-4 flex items-center gap-1.5 text-xs text-[var(--cd-text-muted)]">
+              <Clock size={13} />
+              Chiffres arrêtés au{' '}
+              {new Date(stats.data.generated_at).toLocaleString('fr-FR', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+                timeZone: 'Africa/Dakar',
+              })}
             </p>
           )}
 
           <Link
             to="/system"
-            className="mt-4 inline-block text-sm font-semibold text-brand-text hover:underline"
+            className="mt-3 inline-block text-sm font-semibold text-brand-text hover:underline"
           >
             Diagnostic détaillé →
           </Link>
-        </article>
-
-        <article className="cd-card p-5">
-          <h3 className="text-base font-bold">Avancement du projet</h3>
-          <p className="mt-1 text-sm text-[var(--cd-text-muted)]">
-            Développement par phases : chacune est livrée complète et testée avant
-            la suivante.
-          </p>
-
-          <ol className="mt-4 space-y-2.5">
-            <PhaseRow n={1} label="Initialisation, structure, environnement" done />
-            <PhaseRow n={2} label="Authentification" done />
-            <PhaseRow n={3} label="Membres, rôles et QR Code" done />
-            <PhaseRow n={6} label="GPS et enregistrement des sorties" />
-            <PhaseRow n={12} label="Paiements et encaissements" />
-            <PhaseRow n={13} label="Recettes, dépenses et caisse" />
-          </ol>
         </article>
       </section>
     </div>
@@ -140,30 +329,69 @@ export function DashboardPage() {
 
 /* -------------------------------------------------------------------------- */
 
+const STATUS_COLOR: Record<MemberStatusCode, string> = {
+  ACTIVE: 'var(--cd-green)',
+  PENDING: 'var(--cd-warning)',
+  SUSPENDED: 'var(--cd-danger)',
+  FORMER: 'var(--cd-border-strong)',
+}
+
 interface StatTileProps {
   icon: LucideIcon
   label: string
-  phase: number
   to: string
+  /** Valeur réelle. Absente tant que le module n'est pas livré. */
+  value?: number
+  hint?: string
+  /** Phase qui livrera la valeur — affichée à la place du chiffre. */
+  phase?: number
+  loading?: boolean
   accent?: boolean
 }
 
-function StatTile({ icon: Icon, label, phase, to, accent }: StatTileProps) {
+function StatTile({
+  icon: Icon,
+  label,
+  to,
+  value,
+  hint,
+  phase,
+  loading,
+  accent,
+}: StatTileProps) {
+  const hasValue = value !== undefined
+
   return (
     <Link
       to={to}
       className="cd-card block p-4 transition-colors hover:border-[var(--cd-orange)]"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-[var(--cd-text-muted)]">{label}</span>
+        <span className="text-sm font-semibold text-[var(--cd-text-muted)]">
+          {label}
+        </span>
         <Icon
           size={18}
           className={accent ? 'text-[var(--cd-orange)]' : 'text-[var(--cd-text-muted)]'}
         />
       </div>
-      <p className="tabular mt-2 text-3xl font-extrabold text-[var(--cd-border-strong)]">—</p>
-      <p className="mt-0.5 text-xs text-[var(--cd-text-muted)]">
-        Disponible en phase {phase}
+
+      {loading ? (
+        <span className="mt-2.5 block h-8 w-16 animate-pulse rounded bg-[var(--cd-surface-2)]" />
+      ) : (
+        <p
+          className={
+            hasValue
+              ? 'tabular mt-2 text-3xl font-extrabold'
+              : 'tabular mt-2 text-3xl font-extrabold text-[var(--cd-border-strong)]'
+          }
+        >
+          {hasValue ? value : '—'}
+        </p>
+      )}
+
+      <p className="mt-0.5 min-h-4 text-xs text-[var(--cd-text-muted)]">
+        {hasValue ? hint : phase ? `Disponible en phase ${phase}` : null}
       </p>
     </Link>
   )
@@ -175,29 +403,5 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-[var(--cd-text-muted)]">{label}</dt>
       <dd className="tabular font-semibold">{value}</dd>
     </div>
-  )
-}
-
-function PhaseRow({ n, label, done }: { n: number; label: string; done?: boolean }) {
-  return (
-    <li className="flex items-center gap-3">
-      <span
-        className={
-          done
-            ? 'flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--cd-green)] text-[0.6875rem] font-bold text-white'
-            : 'flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--cd-surface-2)] text-[0.6875rem] font-bold text-[var(--cd-text-muted)]'
-        }
-      >
-        {n}
-      </span>
-      <span className={done ? 'text-sm font-semibold' : 'text-sm text-[var(--cd-text-muted)]'}>
-        {label}
-      </span>
-      {done && (
-        <span className="cd-badge ml-auto bg-[var(--cd-green-soft)] text-[var(--cd-green-hover)]">
-          Terminée
-        </span>
-      )}
-    </li>
   )
 }
