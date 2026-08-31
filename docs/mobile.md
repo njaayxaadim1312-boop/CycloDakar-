@@ -87,7 +87,30 @@ Le bouton **Démarrer / Arrêter** est volontairement surdimensionné (72 dp, vo
 `touch.field` dans `src/theme/tokens.ts`) : il est visé en roulant, parfois avec des
 gants, souvent en plein soleil.
 
-## 7. Résolution de l'adresse de l'API
+## 7. Tests
+
+Jest + `@testing-library/react-native`, lancés par `npm test` dans `mobile/`.
+
+```powershell
+cd mobile
+npm test            # une passe
+npm run test:watch  # en continu pendant le développement
+```
+
+Deux points à connaître :
+
+- **`render` et `fireEvent` sont asynchrones** depuis la version 14 de la
+  bibliothèque : React 19 rend en mode concurrent. Il faut donc les attendre,
+  sinon les requêtes ne trouvent rien à l'écran.
+- **L'API est simulée au niveau d'axios**, pas au niveau des fonctions
+  `fetchMembers` / `searchMembers`. On teste ainsi la chaîne réelle, enveloppe
+  `{ data }` et intercepteur d'erreurs compris — précisément là où les
+  régressions se glissent.
+
+Les modules natifs indisponibles hors appareil (trousseau sécurisé, stockage,
+`expo-device`, icônes SVG) sont doublés dans `jest.setup.js`.
+
+## 8. Résolution de l'adresse de l'API
 
 `src/lib/api.ts` déduit l'URL du backend dans cet ordre :
 

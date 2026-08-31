@@ -135,10 +135,35 @@ autrement qu'en passant par « mot de passe oublié ».
 
 ---
 
-## ⏳ Phase 5 — Interface mobile
+## ✅ Phase 5 — Interface mobile *(terminée)*
 
-Navigation (`@react-navigation`), écrans Accueil, Profil, Historique, splash,
-gestion de session, sélecteur de thème.
+**Navigation**
+
+- Onglets **Accueil · Membres · Profil**, chacun avec sa pile d'écrans.
+- L'aiguillage connecté / non connecté se fait par la présence d'une session,
+  pas par une navigation impérative : un jeton révoqué ailleurs ramène
+  l'utilisateur à la connexion, où qu'il se trouve dans l'application.
+- La place centrale de la barre reste libre : elle accueillera le bouton
+  « Démarrer une sortie » en phase 6.
+
+**Écrans**
+
+- **Accueil** : effectifs réels du club, répartition par statut, modules à venir
+  avec leur phase. Le bouton « Démarrer » est visible mais désactivé — sa place
+  est réservée pour que l'utilisateur sache déjà où le chercher.
+- **Membres** : deux modes automatiques. Sans recherche, l'annuaire complet ;
+  dès la première frappe, la route de recherche allégée. La saisie est différée
+  de 350 ms — sinon « Khadim » déclencherait six requêtes.
+- **Fiche membre** : le contenu suit ce que le serveur autorise à voir.
+- **Mon compte** : fiche club, changement de mot de passe, rotation du QR Code,
+  thème (clair / sombre / système, **persisté**), sessions.
+
+**Tests**
+
+Le mobile n'avait aucun test automatisé. Mise en place de Jest + Testing
+Library : **19 tests**, couvrant la bascule annuaire/recherche, la saisie
+différée, les messages d'échec hors ligne, la persistance du thème et le
+refus d'afficher des chiffres inventés.
 
 ---
 

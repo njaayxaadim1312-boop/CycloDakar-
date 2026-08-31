@@ -174,6 +174,10 @@ curl http://localhost:8000/api/v1/health
 
 # Configuration métier partagée web/mobile
 curl http://localhost:8000/api/v1/config
+
+# Tests
+cd backend && php artisan test     # 128 tests (sur MySQL)
+cd mobile  && npm test             # 19 tests d'écrans
 ```
 
 Puis ouvrez **http://localhost:5173**.
@@ -244,7 +248,7 @@ CycloDakar/
 | 2 | Authentification | ✅ **Terminée** |
 | 3 | Membres, matricules et rôles | ✅ **Terminée** |
 | 4 | Interface web | ✅ **Terminée** |
-| 5 | Interface mobile | ⏳ à venir |
+| 5 | Interface mobile | ✅ **Terminée** |
 | 6–8 | GPS, carte, statistiques, historique | ⏳ |
 | 9–12 | Événements, participations, paiements | ⏳ |
 | 13–14 | Caisse et rapports financiers | ⏳ |

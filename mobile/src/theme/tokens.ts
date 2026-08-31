@@ -27,8 +27,11 @@ const light = {
    * que 2,3:1, illisible en plein soleil. #C46A00 atteint 4,6:1.
    */
   orangeText: '#C46A00',
+  orangeHover: '#E67E00',
   orangeSoft: '#FFF4E6',
+  blueHover: '#003366',
   blueSoft: '#E6EEF5',
+  greenHover: '#28A428',
   greenSoft: '#EAFAEA',
 
   bg: '#F7F7F8',
@@ -66,8 +69,11 @@ const dark: Palette = {
   ...brand,
 
   orangeText: '#FFA733',
+  orangeHover: '#FFB259',
   orangeSoft: '#33240A',
+  blueHover: '#1A5490',
   blueSoft: '#0D1F33',
+  greenHover: '#5FE05F',
   greenSoft: '#10240F',
 
   bg: '#111113',

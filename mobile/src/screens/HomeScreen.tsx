@@ -1,61 +1,63 @@
+import { useQuery } from '@tanstack/react-query'
 import { StatusBar } from 'expo-status-bar'
-import { useState } from 'react'
 import {
-  Alert,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Button } from '../components/Button'
-import { useAuth, useCurrentUser } from '../stores/auth'
+import { fetchDashboardStats } from '../lib/stats'
+import { useCurrentUser } from '../stores/auth'
 import { fontSize, radius, spacing } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
+import type { MemberStatusCode } from '../types/api'
 
 interface HomeScreenProps {
-  onOpenSystem: () => void
+  onOpenMembers: () => void
 }
 
 /**
  * Accueil de l'application connectée.
  *
- * Version de la phase 2 : elle confirme que la session tient et donne accès à
- * la déconnexion. Les tuiles d'action (démarrer une sortie, événements, scan
- * QR) arrivent avec la navigation en phase 5 ; elles sont affichées ici
- * désactivées, avec leur phase, pour que le membre voie où va l'application.
+ * Même règle que sur le web : **aucun chiffre inventé**. Les effectifs sont
+ * réels ; les modules à venir affichent leur phase, jamais un zéro qui
+ * passerait pour une mesure.
+ *
+ * Le bouton « Démarrer une sortie » est le geste principal de l'application :
+ * il est volontairement surdimensionné (72 dp), visé en roulant, parfois avec
+ * des gants. Il arrive en phase 6 et reste ici désactivé plutôt qu'absent —
+ * sa place est réservée, l'utilisateur sait où le chercher.
  */
-export function HomeScreen({ onOpenSystem }: HomeScreenProps) {
+export function HomeScreen({ onOpenMembers }: HomeScreenProps) {
   const { colors, isDark } = useTheme()
   const user = useCurrentUser()
-  const logout = useAuth((state) => state.logout)
-  const [signingOut, setSigningOut] = useState(false)
 
-  function confirmLogout() {
-    Alert.alert(
-      'Se déconnecter',
-      'Voulez-vous vous déconnecter de cet appareil ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Se déconnecter',
-          style: 'destructive',
-          onPress: () => {
-            setSigningOut(true)
-            void logout().finally(() => setSigningOut(false))
-          },
-        },
-      ],
-    )
-  }
+  const stats = useQuery({
+    queryKey: ['stats', 'dashboard'],
+    queryFn: fetchDashboardStats,
+  })
+
+  const members = stats.data?.members
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]} edges={['top']}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={stats.isFetching}
+            onRefresh={() => void stats.refetch()}
+            tintColor={colors.orange}
+            colors={[colors.orange]}
+          />
+        }
+      >
         {/* --- En-tête orange ---------------------------------------------- */}
         <View style={[styles.hero, { backgroundColor: colors.orange }]}>
           <View style={styles.heroRow}>
@@ -75,28 +77,76 @@ export function HomeScreen({ onOpenSystem }: HomeScreenProps) {
           <Text style={styles.heroMotto}>Ensemble, plus loin, plus forts !</Text>
         </View>
 
-        {/* --- Fiche du compte --------------------------------------------- */}
+        {/* --- Action principale ------------------------------------------- */}
+        <Pressable
+          disabled
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          style={[styles.startButton, { backgroundColor: colors.disabledBg }]}
+        >
+          <Text style={[styles.startLabel, { color: colors.disabledText }]}>
+            Démarrer une sortie
+          </Text>
+          <Text style={[styles.startHint, { color: colors.disabledText }]}>
+            Enregistrement GPS · phase 6
+          </Text>
+        </Pressable>
+
+        {/* --- Effectif du club --------------------------------------------- */}
         <View
           style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Mon compte</Text>
+          <View style={styles.cardHead}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Le club</Text>
+            <Pressable onPress={onOpenMembers} hitSlop={8}>
+              <Text style={[styles.link, { color: colors.orangeText }]}>Annuaire →</Text>
+            </Pressable>
+          </View>
 
-          <Row label="Nom" value={user?.name ?? '—'} colors={colors} />
-          <Row
-            label="Téléphone"
-            value={user?.phone_formatted ?? '—'}
-            colors={colors}
-          />
-          <Row label="Email" value={user?.email ?? 'Non renseigné'} colors={colors} />
-          <Row label="Rôle" value={user?.role_label ?? '—'} colors={colors} />
+          {stats.isLoading && (
+            <Text style={[styles.muted, { color: colors.textMuted }]}>Chargement…</Text>
+          )}
 
-          <Button
-            title="Se déconnecter"
-            variant="ghost"
-            loading={signingOut}
-            onPress={confirmLogout}
-            style={styles.logoutButton}
-          />
+          {stats.isError && (
+            <View style={[styles.alert, { backgroundColor: colors.dangerSoft }]}>
+              <Text style={[styles.alertText, { color: colors.danger }]}>
+                Statistiques indisponibles. Vérifiez votre connexion.
+              </Text>
+            </View>
+          )}
+
+          {members && (
+            <>
+              <View style={styles.statRow}>
+                <Stat value={members.active} label="membres actifs" primary />
+                <Stat value={members.joined_this_month} label="ce mois-ci" />
+                <Stat value={members.without_account} label="sans compte" />
+              </View>
+
+              <View style={styles.breakdown}>
+                {(
+                  Object.entries(members.by_status) as [
+                    MemberStatusCode,
+                    { label: string; count: number },
+                  ][]
+                )
+                  .filter(([, entry]) => entry.count > 0)
+                  .map(([code, entry]) => (
+                    <View key={code} style={styles.breakdownRow}>
+                      <View
+                        style={[styles.dot, { backgroundColor: statusColor(code, colors) }]}
+                      />
+                      <Text style={[styles.breakdownLabel, { color: colors.text }]}>
+                        {entry.label}
+                      </Text>
+                      <Text style={[styles.breakdownCount, { color: colors.textMuted }]}>
+                        {entry.count}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
+            </>
+          )}
         </View>
 
         {/* --- Ce qui arrive ------------------------------------------------ */}
@@ -108,18 +158,12 @@ export function HomeScreen({ onOpenSystem }: HomeScreenProps) {
             Les modules arrivent phase par phase.
           </Text>
 
-          <Upcoming emoji="🚴" label="Démarrer une sortie GPS" phase={6} colors={colors} />
-          <Upcoming emoji="📊" label="Mes activités et statistiques" phase={8} colors={colors} />
-          <Upcoming emoji="📅" label="Événements du club" phase={9} colors={colors} />
-          <Upcoming emoji="📷" label="Scanner un QR Code membre" phase={11} colors={colors} />
-          <Upcoming emoji="💰" label="Mes participations" phase={12} colors={colors} />
+          <Upcoming emoji="🚴" label="Enregistrement GPS des sorties" phase={6} />
+          <Upcoming emoji="🗺️" label="Carte et statistiques du parcours" phase={7} />
+          <Upcoming emoji="📅" label="Événements du club" phase={9} />
+          <Upcoming emoji="📷" label="Scanner un QR Code membre" phase={11} />
+          <Upcoming emoji="💰" label="Mes participations" phase={12} />
         </View>
-
-        <Pressable onPress={onOpenSystem} hitSlop={8} style={styles.systemLink}>
-          <Text style={[styles.systemLinkText, { color: colors.orangeText }]}>
-            État du système et diagnostic →
-          </Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   )
@@ -129,13 +173,37 @@ export function HomeScreen({ onOpenSystem }: HomeScreenProps) {
 
 type Colors = ReturnType<typeof useTheme>['colors']
 
-function Row({ label, value, colors }: { label: string; value: string; colors: Colors }) {
+function statusColor(status: MemberStatusCode, colors: Colors): string {
+  return {
+    ACTIVE: colors.green,
+    PENDING: colors.warning,
+    SUSPENDED: colors.danger,
+    FORMER: colors.borderStrong,
+  }[status]
+}
+
+function Stat({
+  value,
+  label,
+  primary,
+}: {
+  value: number
+  label: string
+  primary?: boolean
+}) {
+  const { colors } = useTheme()
+
   return (
-    <View style={[styles.row, { borderTopColor: colors.border }]}>
-      <Text style={[styles.rowLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.rowValue, { color: colors.text }]} numberOfLines={1}>
+    <View style={styles.stat}>
+      <Text
+        style={[
+          styles.statValue,
+          { color: primary ? colors.orangeText : colors.text },
+        ]}
+      >
         {value}
       </Text>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
     </View>
   )
 }
@@ -144,13 +212,13 @@ function Upcoming({
   emoji,
   label,
   phase,
-  colors,
 }: {
   emoji: string
   label: string
   phase: number
-  colors: Colors
 }) {
+  const { colors } = useTheme()
+
   return (
     <View style={[styles.upcoming, { backgroundColor: colors.surface2 }]}>
       <Text style={styles.upcomingEmoji}>{emoji}</Text>
@@ -178,27 +246,46 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: fontSize.h2, fontWeight: '800', color: '#1A1A1A' },
   heroMotto: { fontSize: fontSize.small, color: 'rgba(0,0,0,0.7)' },
 
+  // 72 dp : la cible du geste principal, visée en roulant.
+  startButton: {
+    minHeight: 72,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  startLabel: { fontSize: fontSize.h3, fontWeight: '800' },
+  startHint: { fontSize: fontSize.caption },
+
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.xs,
   },
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   cardTitle: { fontSize: fontSize.h3, fontWeight: '700' },
   cardSub: { fontSize: fontSize.small, marginBottom: spacing.xs },
+  link: { fontSize: fontSize.small, fontWeight: '700' },
+  muted: { fontSize: fontSize.small, marginTop: spacing.sm },
 
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  rowLabel: { fontSize: fontSize.small },
-  rowValue: { fontSize: fontSize.body, fontWeight: '600', flexShrink: 1 },
+  alert: { borderRadius: radius.sm, padding: spacing.md, marginTop: spacing.sm },
+  alertText: { fontSize: fontSize.small, fontWeight: '600', lineHeight: 19 },
 
-  logoutButton: { marginTop: spacing.md },
+  statRow: { flexDirection: 'row', marginTop: spacing.md },
+  stat: { flex: 1, alignItems: 'center', gap: 2 },
+  statValue: { fontSize: fontSize.h1, fontWeight: '800' },
+  statLabel: { fontSize: fontSize.caption, textAlign: 'center' },
+
+  breakdown: { marginTop: spacing.lg, gap: spacing.sm },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  breakdownLabel: { flex: 1, fontSize: fontSize.small },
+  breakdownCount: { fontSize: fontSize.small, fontWeight: '700' },
 
   upcoming: {
     flexDirection: 'row',
@@ -211,7 +298,4 @@ const styles = StyleSheet.create({
   upcomingEmoji: { fontSize: 20 },
   upcomingLabel: { flex: 1, fontSize: fontSize.body, fontWeight: '600' },
   upcomingPhase: { fontSize: fontSize.caption, fontWeight: '700' },
-
-  systemLink: { alignItems: 'center', paddingVertical: spacing.md },
-  systemLinkText: { fontSize: fontSize.small, fontWeight: '700' },
 })

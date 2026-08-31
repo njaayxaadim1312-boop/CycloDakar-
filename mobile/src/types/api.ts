@@ -178,3 +178,144 @@ export interface LoginPayload {
 export interface MessageResult {
   message: string
 }
+
+/* -------------------------------------------------------------------------- */
+/* Membres (phase 3)                                                           */
+/* -------------------------------------------------------------------------- */
+
+export type MemberStatusCode = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'FORMER'
+
+/** Ce que le visiteur a le droit de faire sur une fiche, décidé par le serveur. */
+export interface MemberPermissions {
+  update: boolean
+  update_status: boolean
+  update_role: boolean
+  manage_qr: boolean
+  delete: boolean
+}
+
+/** Compte de connexion associé. `null` pour un membre sans smartphone. */
+export interface MemberAccount {
+  uuid: string
+  role: RoleCode
+  role_label: string
+  is_active: boolean
+  last_login_at: string | null
+}
+
+/**
+ * Fiche membre.
+ *
+ * Plusieurs champs sont optionnels non pas parce qu'ils peuvent être vides,
+ * mais parce que le SERVEUR les omet selon qui regarde : les coordonnées ne
+ * sont visibles que des collecteurs et de l'intéressé, les notes des seuls
+ * administrateurs. Un `undefined` signifie donc « pas le droit de voir », un
+ * `null` signifie « non renseigné ».
+ */
+export interface Member {
+  uuid: string
+  matricule: string
+  first_name: string
+  last_name: string
+  full_name: string
+  initials: string
+  photo_url: string | null
+  status: MemberStatusCode
+  status_label: string
+  joined_at: string | null
+  seniority_years: number
+
+  phone?: string | null
+  phone_formatted?: string | null
+  email?: string | null
+
+  birth_date?: string | null
+  gender?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
+  notes?: string | null
+
+  qr_token?: string
+
+  account?: MemberAccount | null
+  has_account: boolean
+
+  created_at: string | null
+  updated_at: string | null
+
+  permissions?: MemberPermissions
+}
+
+/** Résultat allégé de la recherche terrain. */
+export interface MemberSearchResult {
+  uuid: string
+  matricule: string
+  full_name: string
+  initials: string
+  phone_formatted: string | null
+  photo_url: string | null
+  status: MemberStatusCode
+}
+
+export interface MemberFilters {
+  search?: string
+  status?: MemberStatusCode | ''
+  role?: RoleCode | ''
+  has_account?: '0' | '1' | ''
+  sort?: 'name' | 'matricule' | 'recent' | 'seniority'
+  page?: number
+  per_page?: number
+}
+
+export interface Paginated<T> {
+  data: T[]
+  meta: {
+    current_page: number
+    last_page: number
+    per_page: number
+    total: number
+    has_more: boolean
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tableau de bord (phase 4)                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bloc d'un module pas encore livré.
+ *
+ * `available: false` et non un zéro : « aucune activité » et « module pas
+ * encore livré » ne veulent pas dire la même chose, et sur un tableau de bord
+ * qui affichera un solde de caisse, confondre les deux ruinerait la confiance.
+ */
+export interface PendingModule {
+  available: false
+  phase: number
+}
+
+export interface CountedLabel {
+  label: string
+  count: number
+}
+
+export interface MemberStats {
+  total: number
+  active: number
+  by_status: Record<MemberStatusCode, CountedLabel>
+  by_role: Record<RoleCode, CountedLabel>
+  with_account: number
+  without_account: number
+  joined_this_month: number
+  growth: { month: string; label: string; count: number }[]
+}
+
+export interface DashboardStats {
+  members: MemberStats
+  activities: PendingModule
+  events: PendingModule
+  participations: PendingModule
+  /** `visible: false` quand le club garde la caisse privée. */
+  finance: { visible: boolean; available?: false; phase?: number }
+  generated_at: string
+}
