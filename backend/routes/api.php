@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
+use App\Http\Controllers\Api\V1\ActivityController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemberController;
@@ -135,6 +136,36 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         /*
         |----------------------------------------------------------------------
+        | Activités et GPS — PHASE 6
+        |----------------------------------------------------------------------
+        |
+        | Tout est concu pour un reseau qui tombe : chaque etape peut etre
+        | rejouee sans consequence. L'uuid est genere par le CLIENT et sert de
+        | cle d'idempotence. Voir docs/gps.md §12.
+        |
+        */
+        Route::prefix('activities')->name('activities.')->group(function (): void {
+            Route::get('/', [ActivityController::class, 'index'])->name('index');
+            Route::post('/', [ActivityController::class, 'store'])->name('store');
+
+            Route::get('/{activity}', [ActivityController::class, 'show'])->name('show');
+            Route::patch('/{activity}', [ActivityController::class, 'update'])->name('update');
+            Route::delete('/{activity}', [ActivityController::class, 'destroy'])->name('destroy');
+
+            // Limite large : un membre rentrant d'une sortie de 3 h peut
+            // envoyer des dizaines de lots d'affilee pour rattraper une
+            // coupure. La brider ici ferait echouer la synchronisation.
+            Route::post('/{activity}/points', [ActivityController::class, 'storePoints'])
+                ->middleware('throttle:gps-sync')
+                ->name('points');
+
+            Route::post('/{activity}/finalize', [ActivityController::class, 'finalize'])
+                ->middleware('throttle:gps-sync')
+                ->name('finalize');
+        });
+
+        /*
+        |----------------------------------------------------------------------
         | Modules à venir
         |----------------------------------------------------------------------
         |
@@ -142,7 +173,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | Route::middleware('role:TREASURER')->group(...)   PHASE 13
         | Route::middleware('role:ADMIN')->group(...)       PHASE 19
         |
-        | PHASE 6  — /activities, /activities/{uuid}/points, /finalize
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}

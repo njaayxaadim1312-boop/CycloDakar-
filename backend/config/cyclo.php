@@ -110,9 +110,28 @@ return [
         'auto_pause_after_s' => 10,
         // Segment plus court que cela : bruit à l'arrêt, non compté.
         'min_segment_m' => 1.0,
-        // Dénivelé : hystérésis anti-bruit barométrique/GPS.
-        'elevation_threshold_m' => 3.0,
-        'elevation_smoothing_window' => 5,
+        /*
+        | Dénivelé — les deux réglages les plus délicats du projet.
+        |
+        | L'altitude GPS a une erreur de ±10 à 15 m, et surtout une erreur
+        | LENTE : elle dérive sur des dizaines de secondes au lieu d'osciller
+        | point par point. Un lissage court ne la voit donc pas passer.
+        |
+        | Sans protection suffisante, une sortie parfaitement plate sur la
+        | Corniche afficherait « +500 m » — et l'application perdrait toute
+        | crédibilité en une seule utilisation.
+        |
+        | - fenêtre de 15 points (15 s à 1 Hz) : élimine le bruit rapide sans
+        |   déplacer une vraie montée, qui dure des minutes ;
+        | - seuil de 10 m : un changement de direction n'est acté qu'au-delà.
+        |   Ce seuil est élevé parce que l'altitude vient du GPS. Avec un
+        |   baromètre (5× plus stable), 3 m suffiraient — voir docs/gps.md §9.
+        |
+        | Un vrai dénivelé n'est PAS amputé par ce seuil : il ne s'applique
+        | qu'aux inversions de pente, pas à l'accumulation d'une montée.
+        */
+        'elevation_threshold_m' => 10.0,
+        'elevation_smoothing_window' => 15,
         // Simplification Douglas-Peucker de la trace stockée.
         'simplify_tolerance_m' => 5.0,
         'polyline_precision' => 5,

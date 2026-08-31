@@ -167,14 +167,31 @@ refus d'afficher des chiffres inventés.
 
 ---
 
-## ⏳ Phase 6 — GPS et tracking *(phase la plus délicate)*
+## 🚧 Phase 6 — GPS et tracking *(backend terminé, mobile en cours)*
 
-Capture en arrière-plan (`expo-task-manager` + service de premier plan Android),
-filtre en cascade à 6 tests, calcul distance/vitesse/dénivelé, pause et reprise,
-stockage SQLite local, synchronisation par lots idempotente, recalcul serveur.
+### ✅ Livré : le domaine GPS côté serveur
 
-⚠️ Nécessite une **Development Build** Expo (Expo Go ne gère pas la localisation en
-arrière-plan). Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
+- Tables `activities`, `activity_points`, `activity_stats`, `sync_logs`.
+- **Filtre en cascade à 6 tests** : validité, précision, chronologie, duplicat,
+  vitesse implicite (anti-multipath), accélération. Chaque rejet est compté par
+  motif — sans quoi une trace courte serait inexplicable.
+- **Calculs** : Haversine, temps actif distinct du temps total, vitesse lissée,
+  dénivelé à hystérésis, splits kilométriques, allure, profil d'altitude.
+- **Simplification Douglas-Peucker** (itérative, pas récursive) et encodage
+  Google Polyline : 10 000 points → ~1 Ko.
+- **Synchronisation idempotente** : l'uuid est généré par le client, la
+  contrainte `UNIQUE(activity_id, seq)` absorbe le rejeu d'un lot.
+- **Le client n'est jamais cru** : tout est recalculé serveur à la finalisation.
+
+### ⏳ Reste à livrer : la capture mobile
+
+Tâche de localisation en arrière-plan, stockage SQLite local, file de
+synchronisation, écran de tracking, écran de résumé.
+
+⚠️ Nécessite une **Development Build** Expo (Expo Go ne gère pas la localisation
+en arrière-plan). JDK 17 et le SDK Android sont présents sur le poste.
+
+Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 
 ---
 
