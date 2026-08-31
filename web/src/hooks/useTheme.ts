@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 
 export type ThemeChoice = 'light' | 'dark' | 'system'
 
@@ -19,8 +28,8 @@ function readStoredChoice(): ThemeChoice {
 /**
  * Applique le choix sur `<html>`.
  *
- * « system » ne pose AUCUN attribut : c'est la règle `prefers-color-scheme`
- * de tokens.css qui décide alors. Poser `data-theme` uniquement pour un choix
+ * « system » ne pose AUCUN attribut : c'est la règle `prefers-color-scheme` de
+ * tokens.css qui décide alors. Poser `data-theme` uniquement pour un choix
  * explicite permet de suivre l'OS quand l'utilisateur ne s'est pas prononcé.
  */
 function applyChoice(choice: ThemeChoice): void {
@@ -32,13 +41,26 @@ function applyChoice(choice: ThemeChoice): void {
   }
 }
 
+interface ThemeContextValue {
+  choice: ThemeChoice
+  setChoice: (choice: ThemeChoice) => void
+  isDark: boolean
+  toggle: () => void
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null)
+
 /**
- * Thème clair / sombre / système.
+ * Fournisseur de thème.
+ *
+ * L'état est partagé par un contexte plutôt que dupliqué dans chaque composant :
+ * l'en-tête et les futurs réglages doivent basculer le MÊME thème, sinon
+ * l'icône du bouton et l'apparence réelle se désynchronisent.
  *
  * Le club roule tôt le matin et tard le soir : le mode sombre n'est pas un
  * gadget, il évite d'être ébloui avant le lever du jour.
  */
-export function useTheme() {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [choice, setChoice] = useState<ThemeChoice>(readStoredChoice)
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false,
@@ -64,10 +86,24 @@ export function useTheme() {
 
   const isDark = choice === 'dark' || (choice === 'system' && systemDark)
 
-  /** Bascule clair ↔ sombre en partant de l'apparence réellement affichée. */
+  // La bascule part de l'apparence RÉELLEMENT affichée, pas du réglage : depuis
+  // « système + OS en sombre », un clic doit donner « clair ».
   const toggle = useCallback(() => {
     setChoice(isDark ? 'light' : 'dark')
   }, [isDark])
 
-  return { choice, setChoice, isDark, toggle }
+  const value = useMemo(
+    () => ({ choice, setChoice, isDark, toggle }),
+    [choice, isDark, toggle],
+  )
+
+  return createElement(ThemeContext.Provider, { value }, children)
+}
+
+export function useTheme(): ThemeContextValue {
+  const context = useContext(ThemeContext)
+  if (!context) {
+    throw new Error('useTheme doit être utilisé à l\'intérieur de <ThemeProvider>.')
+  }
+  return context
 }
