@@ -7,6 +7,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
 import { ManagementPage } from '@/pages/ManagementPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { RecordPage } from '@/pages/record/RecordPage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { ActivityDetailPage } from '@/pages/activities/ActivityDetailPage'
@@ -50,6 +51,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
 const IMPLEMENTED = new Set([
   '/',
   '/gestion',
+  '/record',
   '/system',
   '/members',
   '/profile',
@@ -106,6 +108,9 @@ export default function App() {
           {/* Activités — phase 7 */}
           <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/activities/:uuid" element={<ActivityDetailPage />} />
+
+          {/* Enregistrement d'une sortie depuis le navigateur. */}
+          <Route path="/record" element={<RecordPage />} />
 
           {/* Statistiques personnelles — phase 8 */}
           <Route path="/stats" element={<PersonalStatsPage />} />

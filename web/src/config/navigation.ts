@@ -8,6 +8,7 @@ import {
   Footprints,
   Gauge,
   ListChecks,
+  Play,
   Receipt,
   ScrollText,
   Settings,
@@ -75,6 +76,14 @@ export const navigation: NavSection[] = [
         phase: 1,
         summary:
           'Vos objectifs de la semaine, vos dernières sorties et la prochaine sortie du club.',
+      },
+      {
+        to: '/record',
+        label: 'Démarrer une sortie',
+        icon: Play,
+        phase: 1,
+        summary:
+          "Enregistrement GPS depuis le navigateur, avec statistiques en direct : vélo, course, marche, randonnée.",
       },
       {
         to: '/activities',

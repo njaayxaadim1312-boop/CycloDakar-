@@ -188,3 +188,41 @@ Fixtures dans `backend/tests/Fixtures/gps/` :
 | `pause-5min.json` | `moving_time_s` exclut la pause |
 | `duplicate-batch.json` | rejeu d'un lot → aucun point en double |
 | `cold-start.json` | le premier point aberrant est ignoré |
+
+## Enregistrement depuis le navigateur
+
+Le web sait désormais enregistrer une sortie (`/record`), en plus du mobile.
+
+**Le mobile reste la bonne façon d'enregistrer.** Lui seul suit la position
+écran éteint, via une tâche de fond déclarée. Un navigateur cesse de recevoir
+des positions dès que l'onglet passe en arrière-plan ou que l'écran s'éteint —
+c'est une limite de la plateforme, pas du code.
+
+L'écran en tient compte plutôt que de la masquer :
+
+- Il l'annonce **avant** de démarrer, pas après trois heures de sortie.
+- Il demande le verrou d'écran (`navigator.wakeLock`) quand il existe ; son
+  absence n'empêche pas d'enregistrer.
+- Il **signale l'interruption** dès que la page passe en arrière-plan, pour que
+  le membre sache que sa trace aura un trou.
+
+Le filtre est le **même fichier** que sur mobile (`web/src/lib/gps.ts`, miroir
+de `mobile/src/lib/gps.ts`). Ce n'est pas de la commodité : un point accepté
+d'un côté et rejeté de l'autre donnerait deux distances pour la même sortie.
+
+Le protocole d'envoi est celui de la phase 6, sans exception :
+
+| Étape | Garantie |
+|---|---|
+| `POST /activities` | l'`uuid` vient du client et sert de clé d'idempotence |
+| `POST /activities/{uuid}/points` | lots de 500 au plus, points numérotés (`seq`) |
+| curseur d'envoi | n'avance **qu'après** confirmation du serveur |
+| `POST /activities/{uuid}/finalize` | `expected_points_count` révèle une trace tronquée |
+
+Les chiffres affichés pendant la sortie sont **provisoires**, et l'écran le
+dit. Le serveur refiltre et recalcule tout à la finalisation : c'est son
+résultat qui fait foi, conformément à la règle « le client n'est jamais cru ».
+
+Le titre se pose **après** la finalisation, par un `PATCH` : la finalisation
+fige la trace et recalcule les statistiques, l'y glisser ferait passer un champ
+d'affichage pour une donnée de mesure.

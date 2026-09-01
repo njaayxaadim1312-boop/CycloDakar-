@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, ChevronRight, Route } from 'lucide-react'
+import { CalendarDays, ChevronRight, Play, Route } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ActivityRings } from '@/components/activity/ActivityRings'
 import { GoalsDialog } from '@/components/activity/GoalsDialog'
@@ -140,6 +140,18 @@ export function ActivityHomePage() {
           </div>
         </div>
       </section>
+
+      {/* --- Le geste principal ------------------------------------------
+          Volontairement juste sous les anneaux et surdimensionné (72 px) :
+          c'est la raison d'ouvrir l'application, et il doit se viser en
+          tenue de sport, parfois avec des gants. */}
+      <Link
+        to="/record"
+        className="cd-rise flex min-h-[72px] items-center justify-center gap-3 rounded-[var(--cd-radius-pill)] bg-[var(--cd-orange)] text-xl font-extrabold text-[var(--cd-black)] transition-colors hover:bg-[var(--cd-orange-hover)]"
+      >
+        <Play size={24} fill="currentColor" aria-hidden="true" />
+        Démarrer une sortie
+      </Link>
 
       {noProfile && (
         <p className="cd-rise rounded-[var(--cd-radius-lg)] border border-[var(--cd-border)] bg-[var(--cd-surface)] p-5 text-sm text-[var(--cd-text-muted)]">
