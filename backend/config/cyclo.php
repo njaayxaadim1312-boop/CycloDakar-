@@ -90,6 +90,24 @@ return [
             'uses_pace' => true,
             'met' => 6.0,
         ],
+
+        /*
+         | La marche est le sport le plus pratiqué du club, et de loin le plus
+         | exigeant pour le filtre GPS : à 1,4 m/s, le bruit de position pèse
+         | autant que le déplacement réel. D'où un intervalle plus long et une
+         | distance minimale plus grande qu'en course — sans quoi la trace se
+         | remplirait de zigzags qui gonfleraient la distance.
+         */
+        'WALKING' => [
+            'label' => 'Marche',
+            'icon' => 'walk',
+            'sample_interval_s' => 3,
+            'min_distance_m' => 4,
+            'max_accuracy_m' => 25,
+            'max_speed_mps' => 3.5,
+            'uses_pace' => true,
+            'met' => 3.5,
+        ],
     ],
 
     /*

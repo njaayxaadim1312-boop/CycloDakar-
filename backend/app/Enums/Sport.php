@@ -17,6 +17,7 @@ enum Sport: string
     case Cycling = 'CYCLING';
     case Running = 'RUNNING';
     case Hiking = 'HIKING';
+    case Walking = 'WALKING';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum Sport: string
             self::Cycling => 'Cyclisme',
             self::Running => 'Course',
             self::Hiking => 'Randonnée',
+            self::Walking => 'Marche',
         };
     }
 
@@ -34,6 +36,22 @@ enum Sport: string
     public function usesPace(): bool
     {
         return $this !== self::Cycling;
+    }
+
+    /**
+     * Emoji du sport.
+     *
+     * Sur un écran d'activité, un pictogramme se lit plus vite qu'un mot et
+     * survit à la troncature d'une liste étroite.
+     */
+    public function emoji(): string
+    {
+        return match ($this) {
+            self::Cycling => '🚴',
+            self::Running => '🏃',
+            self::Hiking => '🥾',
+            self::Walking => '🚶',
+        };
     }
 
     /** Vitesse maximale plausible, en m/s. Au-delà, c'est un saut GPS. */

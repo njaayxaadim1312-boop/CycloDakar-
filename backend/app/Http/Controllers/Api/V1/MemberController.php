@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\MemberStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\UpdateGoalsRequest;
 use App\Http\Requests\Member\StoreMemberRequest;
 use App\Http\Requests\Member\UpdateMemberRequest;
 use App\Http\Requests\Member\UpdateRoleRequest;
@@ -123,6 +124,38 @@ final class MemberController extends Controller
             ])->all(),
             meta: ['count' => $members->count()],
         );
+    }
+
+    /**
+     * Objectifs hebdomadaires du membre connecte.
+     *
+     * Chacun ajuste les siens ; personne ne fixe ceux d'un autre. Un objectif
+     * impose par le bureau serait une pression, pas un encouragement.
+     *
+     * Les trois champs sont independants : relever la distance sans toucher
+     * au reste doit fonctionner.
+     */
+    public function updateGoals(UpdateGoalsRequest $request): JsonResponse
+    {
+        $member = $request->user()->member;
+
+        $map = [
+            'distance_m' => 'weekly_distance_goal_m',
+            'moving_time_s' => 'weekly_moving_time_goal_s',
+            'activities' => 'weekly_activities_goal',
+        ];
+
+        $changes = [];
+
+        foreach ($request->validated() as $key => $value) {
+            $changes[$map[$key]] = $value;
+        }
+
+        if ($changes !== []) {
+            $member->update($changes);
+        }
+
+        return ApiResponse::ok($member->fresh()->weeklyGoals());
     }
 
     public function show(Member $member): JsonResponse

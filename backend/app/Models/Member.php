@@ -41,6 +41,12 @@ use Illuminate\Support\Str;
     'emergency_contact_name',
     'emergency_contact_phone',
     'notes',
+
+    // Objectifs hebdomadaires : le membre les fixe lui-meme, ce sont bien
+    // des champs de formulaire.
+    'weekly_distance_goal_m',
+    'weekly_moving_time_goal_s',
+    'weekly_activities_goal',
 ])]
 class Member extends Model
 {
@@ -57,6 +63,9 @@ class Member extends Model
             'joined_at' => 'date',
             'qr_rotated_at' => 'datetime',
             'status' => MemberStatus::class,
+            'weekly_distance_goal_m' => 'integer',
+            'weekly_moving_time_goal_s' => 'integer',
+            'weekly_activities_goal' => 'integer',
         ];
     }
 
@@ -100,6 +109,24 @@ class Member extends Model
      * uniquement à interroger le serveur, qui décide alors quoi renvoyer et
      * à qui. Voir docs/security.md §7.
      */
+    /**
+     * Objectifs hebdomadaires, tels que l'API les expose.
+     *
+     * Unites SI, comme partout ailleurs. Ils servent de reference aux anneaux
+     * d'activite : sans objectif, un anneau ne pourrait qu'inventer une
+     * echelle, ce que le projet s'interdit.
+     *
+     * @return array{distance_m: int, moving_time_s: int, activities: int}
+     */
+    public function weeklyGoals(): array
+    {
+        return [
+            'distance_m' => (int) $this->weekly_distance_goal_m,
+            'moving_time_s' => (int) $this->weekly_moving_time_goal_s,
+            'activities' => (int) $this->weekly_activities_goal,
+        ];
+    }
+
     public static function generateQrToken(): string
     {
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');

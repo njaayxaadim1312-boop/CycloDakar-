@@ -44,6 +44,7 @@ final class PersonalStatsService
             'period_from' => $from?->toDateString(),
 
             'totals' => $this->totals($member, $from),
+            'goals' => $member->weeklyGoals(),
             'by_sport' => $this->bySport($member, $from),
 
             // Les records portent sur TOUTE la carrière du membre, jamais sur
@@ -51,7 +52,109 @@ final class PersonalStatsService
             'records' => $this->records($member),
 
             'trend' => $this->weeklyTrend($member),
+
+            // Anneaux d'activite : toujours la SEMAINE en cours, quelle que
+            // soit la periode demandee. Un objectif hebdomadaire compare aux
+            // cumuls de l'annee ne voudrait rien dire, et un anneau rempli a
+            // 900 % ne se lit pas.
+            'rings' => $this->rings($member),
         ];
+    }
+
+    /**
+     * Anneaux d'activite de la semaine en cours.
+     *
+     * Trois mesures, trois anneaux, a la maniere de l'application Forme :
+     * distance, temps en mouvement, nombre de sorties. Chacun porte sa valeur
+     * BRUTE et son objectif ; le pourcentage est calcule ici une fois pour
+     * toutes plutot que dans chaque client, pour que le web et le mobile
+     * remplissent exactement pareil.
+     *
+     * Le depassement n'est pas ecrete a 100 % : une semaine a 150 % merite de
+     * se voir. C'est au client de decider s'il enroule l'anneau une seconde
+     * fois ou s'il l'arrete au tour complet.
+     *
+     * @return array<string, mixed>
+     */
+    private function rings(Member $member): array
+    {
+        $from = CarbonImmutable::now()->startOfWeek();
+        $goals = $member->weeklyGoals();
+
+        $row = $this->scope($member, $from)
+            ->selectRaw('
+                COUNT(*) as activities,
+                COALESCE(SUM(distance_m), 0) as distance_m,
+                COALESCE(SUM(moving_time_s), 0) as moving_time_s
+            ')
+            ->first();
+
+        $current = [
+            'distance_m' => (int) ($row->distance_m ?? 0),
+            'moving_time_s' => (int) ($row->moving_time_s ?? 0),
+            'activities' => (int) ($row->activities ?? 0),
+        ];
+
+        $rings = [];
+
+        foreach ($goals as $key => $goal) {
+            $value = $current[$key];
+
+            $rings[$key] = [
+                'value' => $value,
+                'goal' => $goal,
+                // Un objectif a zero est desactive : on renvoie null plutot
+                // qu'une division par zero ou un 100 % trompeur.
+                'percent' => $goal > 0 ? round(($value / $goal) * 100, 1) : null,
+                'completed' => $goal > 0 && $value >= $goal,
+            ];
+        }
+
+        return [
+            'week_start' => $from->toDateString(),
+            'metrics' => $rings,
+            // Jours de la semaine ou le membre a bouge : la trame de fond des
+            // anneaux, qui montre la REGULARITE plutot que le seul volume.
+            'days' => $this->weekDays($member, $from),
+        ];
+    }
+
+    /**
+     * Les sept jours de la semaine en cours, actifs ou non.
+     *
+     * Les jours vides sont presents : une semaine ou l'on a roule lundi et
+     * dimanche ne se lit pas comme une semaine ou l'on a roule deux jours de
+     * suite, et c'est precisement ce que le membre veut voir.
+     *
+     * @return list<array{date: string, label: string, distance_m: int, active: bool}>
+     */
+    private function weekDays(Member $member, CarbonImmutable $from): array
+    {
+        $rows = $this->scope($member, $from)->get(['started_at', 'distance_m']);
+
+        $buckets = [];
+
+        foreach ($rows as $row) {
+            $key = CarbonImmutable::parse($row->started_at)->toDateString();
+            $buckets[$key] = ($buckets[$key] ?? 0) + (int) $row->distance_m;
+        }
+
+        $labels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        $days = [];
+
+        for ($i = 0; $i < 7; $i++) {
+            $day = $from->addDays($i);
+            $key = $day->toDateString();
+
+            $days[] = [
+                'date' => $key,
+                'label' => $labels[$i],
+                'distance_m' => $buckets[$key] ?? 0,
+                'active' => isset($buckets[$key]),
+            ];
+        }
+
+        return $days;
     }
 
     /* ---------------------------------------------------------------------- */

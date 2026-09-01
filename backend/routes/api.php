@@ -119,6 +119,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             // « me » ne soit pas pris pour un uuid.
             Route::get('/me', [MemberController::class, 'me'])->name('me');
 
+            // Objectifs hebdomadaires : chacun ajuste les siens.
+            Route::patch('/me/goals', [MemberController::class, 'updateGoals'])
+                ->name('me.goals');
+
             // Recherche rapide pour la collecte sur le terrain : charge utile
             // réduite, limite basse. C'est elle qui remplace la saisie
             // manuelle des noms.
