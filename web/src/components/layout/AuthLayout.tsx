@@ -18,7 +18,7 @@ interface AuthLayoutProps {
  *
  * L'affiche porte déjà son propre mot d'ordre (« Ensemble, pédalons plus
  * loin ! ») : on ne superpose donc aucune reprise de la devise, qui ferait
- * doublon avec ce que l'image dit déjà. Seule reste, en bas, la phrase qui
+ * doublon avec ce que l'image dit déjà. Sous elle, une seule phrase, celle qui
  * explique ce que fait l'application — la seule information que l'affiche
  * n'apporte pas.
  */
@@ -44,28 +44,36 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
       </div>
 
       {/* --- Affiche du club ----------------------------------------------
-          L'orange reste sous l'image : il tient la colonne pendant le
-          chargement et si le fichier venait à manquer, plutôt qu'un rectangle
-          blanc au milieu de l'écran. */}
-      <div className="relative hidden overflow-hidden bg-[var(--cd-orange)] lg:block">
-        <img
-          src="/brand/hero.jpg"
-          alt="Affiche du club : un membre de Cyclo Dakar à vélo, gilet de sécurité et casque audio, sous le mot d'ordre « Ensemble, pédalons plus loin ! »"
-          className="absolute inset-0 size-full object-cover object-center"
-        />
+          L'affiche est montrée ENTIÈRE, jamais recadrée. Un `object-cover`
+          plein cadre coupait l'en-tête « CYCLO DAKAR », le médaillon et le
+          bandeau « Passion · Dépassement · Solidarité » — c'est-à-dire une
+          bonne part de ce que l'affiche a à dire. Elle est donc posée comme
+          une affiche : entière, sur le fond orange du club.
 
-        {/* Dégradé de lisibilité : le texte blanc doit tenir quel que soit
-            l'endroit où l'affiche est recadrée par `object-cover`. */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 to-transparent"
-          aria-hidden="true"
-        />
+          `flex-1` + `min-h-0` sur l'enveloppe, `max-h-full w-auto` sur l'image :
+          elle occupe la hauteur disponible quelle que soit la fenêtre, sans
+          hauteur fixe en `vh` qui déborderait sur un écran bas. Et comme la
+          boîte de l'image épouse alors les pixels peints, l'arrondi et l'ombre
+          tombent sur l'affiche, et non sur une zone vide autour d'elle. */}
+      <div className="hidden bg-[var(--cd-orange)] lg:block">
+        <div className="flex h-full flex-col items-center justify-center gap-8 p-10 xl:p-12">
+          <div className="flex min-h-0 flex-1 items-center">
+            <img
+              src="/brand/hero.jpg"
+              alt="Affiche du club : un membre de Cyclo Dakar à vélo, gilet de sécurité et casque audio, sous le mot d'ordre « Ensemble, pédalons plus loin ! »"
+              className="max-h-full w-auto max-w-full rounded-2xl object-contain shadow-2xl ring-1 ring-black/10"
+            />
+          </div>
 
-        <p className="absolute inset-x-0 bottom-0 p-10 text-[15px] leading-relaxed text-white/90">
-          Enregistrez vos sorties au GPS, suivez les événements du club, gérez les
-          participations et la caisse — au même endroit, sur téléphone comme sur
-          ordinateur.
-        </p>
+          {/* La seule information que l'affiche n'apporte pas. Sur le fond
+              orange, le noir translucide reste lisible là où du blanc ne le
+              serait pas. */}
+          <p className="max-w-md shrink-0 text-center text-[15px] leading-relaxed text-black/70">
+            Enregistrez vos sorties au GPS, suivez les événements du club, gérez les
+            participations et la caisse — au même endroit, sur téléphone comme sur
+            ordinateur.
+          </p>
+        </div>
       </div>
     </div>
   )
