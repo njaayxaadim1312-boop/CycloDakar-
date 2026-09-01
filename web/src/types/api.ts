@@ -316,10 +316,24 @@ export interface ClubActivityStats {
   this_month: number
 }
 
+/** Sorties officielles — mesurées depuis la phase 9. */
+export interface ClubEventStats {
+  available: true
+  upcoming: number
+  /** `null` pour un compte sans fiche membre. */
+  my_upcoming: number | null
+  next: {
+    uuid: string
+    title: string
+    starts_at: string | null
+    location_name: string
+  } | null
+}
+
 export interface DashboardStats {
   members: MemberStats
   activities: ClubActivityStats
-  events: PendingModule
+  events: ClubEventStats
   participations: PendingModule
   /** `visible: false` quand le club garde la caisse privée. */
   finance: { visible: boolean; available?: false; phase?: number }
@@ -509,4 +523,104 @@ export interface PersonalStats {
   /** Records sur TOUTE la carrière, jamais sur la période affichée. */
   records: PersonalRecords
   trend: WeeklyTrendPoint[]
+}
+
+/* -------------------------------------------------------------------------- */
+/* Événements (phase 9)                                                        */
+/* -------------------------------------------------------------------------- */
+
+export type EventStatusCode = 'DRAFT' | 'PUBLISHED' | 'ONGOING' | 'DONE' | 'CANCELLED'
+export type EventDifficultyCode = 'EASY' | 'MEDIUM' | 'HARD'
+export type RegistrationStatusCode = 'REGISTERED' | 'WAITLIST' | 'CANCELLED'
+export type AttendanceStatusCode = 'UNKNOWN' | 'PRESENT' | 'ABSENT'
+
+/** L'inscription du membre connecté. `null` s'il n'est pas inscrit. */
+export interface MyRegistration {
+  status: RegistrationStatusCode
+  status_label: string
+  /** Rang dans la file d'attente, `null` dès qu'une place est obtenue. */
+  queue_position: number | null
+  attendance_status: AttendanceStatusCode
+  registered_at: string | null
+}
+
+export interface EventParticipant {
+  member?: {
+    uuid: string
+    matricule: string
+    full_name: string
+    initials: string
+    photo_url: string | null
+  }
+  registration_status: RegistrationStatusCode
+  registration_status_label: string
+  queue_position: number | null
+  registered_at: string | null
+  attendance_status: AttendanceStatusCode
+  attendance_status_label: string
+  checked_in_at: string | null
+  checked_in_by?: { uuid: string; name: string }
+  activity_uuid?: string | null
+}
+
+/**
+ * Une sortie officielle du club.
+ *
+ * `planned_distance_m` est en MÈTRES, comme toutes les distances de l'API.
+ * `seats_left` vaut `null` quand la sortie n'est pas limitée — et non un
+ * grand nombre, qui laisserait croire à une limite haute.
+ */
+export interface ClubEvent {
+  uuid: string
+  title: string
+  description: string | null
+
+  sport: SportCode
+  sport_label: string
+
+  status: EventStatusCode
+  status_label: string
+
+  starts_at: string | null
+  ends_at: string | null
+
+  location_name: string
+  start_lat: number | null
+  start_lng: number | null
+
+  planned_distance_m: number | null
+  route_polyline: string | null
+
+  difficulty: EventDifficultyCode | null
+  difficulty_label: string | null
+  difficulty_hint: string | null
+
+  max_participants: number | null
+  seats_taken: number
+  seats_left: number | null
+  is_full: boolean
+
+  registrations_open: boolean
+  my_registration: MyRegistration | null
+
+  created_by?: { uuid: string; name: string }
+  participants?: EventParticipant[]
+
+  permissions: {
+    update: boolean
+    delete: boolean
+    manage_attendance: boolean
+  } | null
+
+  created_at: string | null
+}
+
+/** Compteurs renvoyés à chaque mouvement d'inscription. */
+export interface EventTally {
+  registered: number
+  waitlist: number
+  cancelled: number
+  present: number
+  max_participants: number | null
+  seats_left: number | null
 }

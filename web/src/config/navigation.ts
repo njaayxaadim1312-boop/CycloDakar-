@@ -241,7 +241,7 @@ export const navigation: NavSection[] = [
  *
  * À incrémenter à chaque phase terminée — voir `docs/roadmap.md`.
  */
-export const DELIVERED_THROUGH_PHASE = 8
+export const DELIVERED_THROUGH_PHASE = 9
 
 /** L'écran correspondant à cet élément est-il déjà utilisable ? */
 export function isDelivered(item: NavItem): boolean {

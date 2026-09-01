@@ -8,6 +8,9 @@ import { ProfilePage } from '@/pages/ProfilePage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { ActivityDetailPage } from '@/pages/activities/ActivityDetailPage'
+import { EventDetailPage } from '@/pages/events/EventDetailPage'
+import { EventFormPage } from '@/pages/events/EventFormPage'
+import { EventsPage } from '@/pages/events/EventsPage'
 import { MemberDetailPage } from '@/pages/members/MemberDetailPage'
 import { MemberFormPage } from '@/pages/members/MemberFormPage'
 import { MembersPage } from '@/pages/members/MembersPage'
@@ -32,6 +35,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 4  /profile
  *   PHASE 7  /activities, /activities/:uuid
  *   PHASE 8  /stats
+ *   PHASE 9  /events, /events/nouveau, /events/:uuid, /events/:uuid/modifier
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
@@ -42,6 +46,7 @@ const IMPLEMENTED = new Set([
   '/profile',
   '/activities',
   '/stats',
+  '/events',
 ])
 
 export default function App() {
@@ -82,6 +87,13 @@ export default function App() {
 
           {/* Statistiques personnelles — phase 8 */}
           <Route path="/stats" element={<PersonalStatsPage />} />
+
+          {/* Événements — phase 9. « nouveau » est déclaré AVANT « :uuid »
+              pour ne pas être pris pour un identifiant. */}
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/nouveau" element={<EventFormPage />} />
+          <Route path="/events/:uuid" element={<EventDetailPage />} />
+          <Route path="/events/:uuid/modifier" element={<EventFormPage />} />
 
           {allNavItems
             .filter((item) => !IMPLEMENTED.has(item.to))

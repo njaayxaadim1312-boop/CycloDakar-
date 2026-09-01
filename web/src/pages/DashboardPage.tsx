@@ -137,9 +137,16 @@ export function DashboardPage() {
           />
           <StatTile
             icon={CalendarDays}
-            label="Événements"
+            label="Sorties à venir"
             to="/events"
-            phase={stats.data?.events.phase}
+            value={stats.data?.events.upcoming}
+            hint={
+              stats.data === undefined
+                ? undefined
+                : stats.data.events.next !== null
+                  ? `Prochaine : ${stats.data.events.next.title}`
+                  : 'Aucune sortie au calendrier'
+            }
             loading={stats.isLoading}
           />
           {stats.data?.finance.visible && (
