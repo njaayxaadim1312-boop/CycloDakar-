@@ -87,3 +87,22 @@ Les tokens sont définis une seule fois par plateforme et **jamais** redéfinis 
 - Mobile : `mobile/src/theme/tokens.ts`.
 
 Toute nouvelle couleur doit d'abord être ajoutée aux tokens.
+
+## Affiches du club
+
+Deux affiches vivent dans `assets/brand/`, et une seule sert dans l'interface.
+
+`affiche-ensemble-pedalons.jpg` (copiée en `web/public/brand/hero.jpg`) occupe le
+panneau droit des écrans d'authentification. Format portrait, un sujet unique,
+lisible réduite : elle supporte le recadrage d'`object-cover` sans perdre son
+propos. **Aucune reprise de la devise ne se superpose à elle** — l'affiche porte
+déjà « Ensemble, pédalons plus loin ! », et le répéter par-dessus ferait doublon.
+
+`affiche-grand-tour-2025.jpg` n'est pas utilisée comme décor : elle est dense en
+informations (horaires, étapes, consignes de sécurité) et deviendrait illisible
+réduite à un fond. Sa place est dans le module Événements, à taille réelle et
+téléchargeable — PHASE 9.
+
+Limite connue : la source fait 853 × 1280 px. Sur un grand écran haute densité,
+le panneau l'agrandit et le rendu s'adoucit légèrement. Une version en 1600 px de
+large la corrigerait si le club dispose du fichier d'origine.

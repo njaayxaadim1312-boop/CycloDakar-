@@ -11,10 +11,16 @@ interface AuthLayoutProps {
 /**
  * Coquille des écrans de connexion, d'inscription et de mot de passe oublié.
  *
- * Deux colonnes sur grand écran : le formulaire à gauche, un panneau orange
- * portant l'identité du club à droite. Sur mobile, le panneau disparaît — un
- * membre qui se connecte au bord de la route veut le formulaire, pas une
- * illustration qui pousse le champ mot de passe sous la ligne de flottaison.
+ * Deux colonnes sur grand écran : le formulaire à gauche, l'affiche du club à
+ * droite. Sur mobile, le panneau disparaît — un membre qui se connecte au bord
+ * de la route veut le formulaire, pas une image qui pousse le champ mot de
+ * passe sous la ligne de flottaison.
+ *
+ * L'affiche porte déjà son propre mot d'ordre (« Ensemble, pédalons plus
+ * loin ! ») : on ne superpose donc aucune reprise de la devise, qui ferait
+ * doublon avec ce que l'image dit déjà. Seule reste, en bas, la phrase qui
+ * explique ce que fait l'application — la seule information que l'affiche
+ * n'apporte pas.
  */
 export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProps) {
   return (
@@ -37,25 +43,29 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
         </div>
       </div>
 
-      {/* --- Panneau de marque -------------------------------------------- */}
+      {/* --- Affiche du club ----------------------------------------------
+          L'orange reste sous l'image : il tient la colonne pendant le
+          chargement et si le fichier venait à manquer, plutôt qu'un rectangle
+          blanc au milieu de l'écran. */}
       <div className="relative hidden overflow-hidden bg-[var(--cd-orange)] lg:block">
-        <div className="flex h-full flex-col justify-end p-12">
-          <p className="font-display text-5xl leading-[1.05] font-extrabold text-[var(--cd-black)]">
-            Ensemble,
-            <br />
-            plus loin,
-            <br />
-            plus forts !
-          </p>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-black/70">
-            Enregistrez vos sorties au GPS, suivez les événements du club, gérez les
-            participations et la caisse — au même endroit, sur téléphone comme sur
-            ordinateur.
-          </p>
-          <p className="mt-8 text-xs font-bold tracking-[0.14em] text-black/55 uppercase">
-            Passion · Dépassement · Solidarité
-          </p>
-        </div>
+        <img
+          src="/brand/hero.jpg"
+          alt="Affiche du club : un membre de Cyclo Dakar à vélo, gilet de sécurité et casque audio, sous le mot d'ordre « Ensemble, pédalons plus loin ! »"
+          className="absolute inset-0 size-full object-cover object-center"
+        />
+
+        {/* Dégradé de lisibilité : le texte blanc doit tenir quel que soit
+            l'endroit où l'affiche est recadrée par `object-cover`. */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 to-transparent"
+          aria-hidden="true"
+        />
+
+        <p className="absolute inset-x-0 bottom-0 p-10 text-[15px] leading-relaxed text-white/90">
+          Enregistrez vos sorties au GPS, suivez les événements du club, gérez les
+          participations et la caisse — au même endroit, sur téléphone comme sur
+          ordinateur.
+        </p>
       </div>
     </div>
   )
