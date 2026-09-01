@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { StatusBar } from 'expo-status-bar'
+import { ScanLine } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -14,12 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Avatar } from '../components/Avatar'
 import { MemberStatusBadge, NoAccountBadge, RoleBadge } from '../components/Badge'
 import { fetchMembers, searchMembers } from '../lib/members'
+import { useCurrentUser } from '../stores/auth'
 import { fontSize, radius, spacing, touch } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
 import type { Member, MemberSearchResult } from '../types/api'
 
 interface MembersScreenProps {
   onOpenMember: (uuid: string) => void
+  onScan: () => void
 }
 
 /**
@@ -36,8 +39,9 @@ interface MembersScreenProps {
  * Le champ est en haut, large et toujours visible : sur un téléphone tenu à
  * une main, c'est le geste le plus fréquent.
  */
-export function MembersScreen({ onOpenMember }: MembersScreenProps) {
+export function MembersScreen({ onOpenMember, onScan }: MembersScreenProps) {
   const { colors, isDark } = useTheme()
+  const user = useCurrentUser()
 
   const [input, setInput] = useState('')
   const [term, setTerm] = useState('')
@@ -76,7 +80,27 @@ export function MembersScreen({ onOpenMember }: MembersScreenProps) {
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Membres</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: colors.text }]}>Membres</Text>
+
+          {/*
+            Le scan est reserve aux collecteurs : identifier quelqu'un n'est
+            pas le geste d'un membre, et des la phase 12 cela permettra
+            d'encaisser en son nom. Le bouton n'apparait donc pas du tout —
+            le serveur refuse de toute facon, mais montrer une porte fermee
+            n'apprend rien.
+          */}
+          {user?.abilities.collect === true && (
+            <Pressable
+              onPress={onScan}
+              accessibilityRole="button"
+              accessibilityLabel="Scanner un QR Code"
+              style={[styles.scanButton, { backgroundColor: colors.orange }]}
+            >
+              <ScanLine color={colors.black} size={20} />
+            </Pressable>
+          )}
+        </View>
 
         <TextInput
           value={input}
@@ -183,6 +207,18 @@ export function MembersScreen({ onOpenMember }: MembersScreenProps) {
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scanButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   safe: { flex: 1 },
 
   header: { padding: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },

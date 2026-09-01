@@ -6,7 +6,6 @@ import {
   Monitor,
   Moon,
   Pencil,
-  QrCode,
   RefreshCw,
   Sun,
 } from 'lucide-react'
@@ -21,7 +20,7 @@ import {
   RoleBadge,
 } from '@/components/ui/StatusBadge'
 import { useTheme, type ThemeChoice } from '@/hooks/useTheme'
-import { ApiError, postData } from '@/lib/api'
+import { API_URL, ApiError, postData } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { fetchMyMember, rotateQrCode } from '@/lib/members'
 import { useAuth, useCurrentUser } from '@/stores/auth'
@@ -258,66 +257,83 @@ function PasswordSection() {
 
 function QrSection({ uuid }: { uuid: string }) {
   const queryClient = useQueryClient()
-  const [confirming, setConfirming] = useState(false)
 
-  const mutation = useMutation({
+  /*
+   * L'image est demandée au serveur, pas fabriquée ici.
+   *
+   * Une seule source produit le QR : la même image sur le web, sur le mobile
+   * et à l'impression. Une bibliothèque JavaScript en produirait une seconde,
+   * qu'il faudrait garder identique à la première — et qui divergerait le jour
+   * où l'une des deux changerait de niveau de correction d'erreur.
+   *
+   * `cacheBust` force le rechargement après une rotation : le navigateur
+   * garderait sinon l'ancienne image, et le membre présenterait un code
+   * révoqué sans le savoir.
+   */
+  const [cacheBust, setCacheBust] = useState(0)
+
+  const rotate = useMutation({
     mutationFn: () => rotateQrCode(uuid),
     onSuccess: () => {
-      setConfirming(false)
+      setCacheBust((n) => n + 1)
       void queryClient.invalidateQueries({ queryKey: ['member', 'me'] })
     },
   })
 
+  const src = `${API_URL}/members/${uuid}/qr?v=${cacheBust}`
+
   return (
     <section className="cd-card p-5">
-      <h3 className="flex items-center gap-2 text-lg">
-        <QrCode size={19} className="text-[var(--cd-blue)]" />
-        Mon QR Code
-      </h3>
+      <h3 className="text-lg">Mon QR Code</h3>
       <p className="mt-1 text-sm text-[var(--cd-text-muted)]">
-        Il permet au collecteur de vous identifier en un scan. Il ne contient
-        aucune donnée personnelle : photographié par un tiers, il ne révèle rien.
-        Son affichage et son impression arrivent en phase 11.
+        Il permet à un collecteur de vous identifier en un scan. Il ne contient{' '}
+        <strong>aucune donnée personnelle</strong> : ni votre nom, ni votre
+        téléphone — seulement un jeton que le club seul sait interpréter.
       </p>
 
-      <div className="mt-4">
-        {confirming ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm">
-              Générer un nouveau QR ? L'ancien cessera de fonctionner.
-            </span>
-            <button
-              type="button"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-              className="cd-btn cd-btn-primary !min-h-9"
-            >
-              {mutation.isPending ? 'En cours…' : 'Confirmer'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="cd-btn cd-btn-ghost !min-h-9"
-            >
-              Annuler
-            </button>
-          </div>
-        ) : (
+      <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+        {/* Fond blanc obligatoire : un QR sur fond sombre n'est pas lu par la
+            plupart des appareils, et le mode sombre l'aurait rendu invisible. */}
+        <div className="rounded-[var(--cd-radius)] bg-white p-3 shadow-[var(--cd-shadow)]">
+          <img
+            src={src}
+            alt="Votre QR Code personnel"
+            width={200}
+            height={200}
+            className="size-[200px]"
+          />
+        </div>
+
+        <div className="flex-1 space-y-3 text-sm text-[var(--cd-text-muted)]">
+          <p>
+            Présentez cet écran au collecteur, ou faites-le imprimer par le
+            bureau si vous préférez une carte.
+          </p>
+          <p>
+            Si vous perdez votre carte, régénérez le code : l'ancien cesse
+            aussitôt de fonctionner.
+          </p>
+
           <button
             type="button"
-            onClick={() => setConfirming(true)}
+            onClick={() => rotate.mutate()}
+            disabled={rotate.isPending}
             className="cd-btn cd-btn-ghost"
           >
             <RefreshCw size={16} />
-            Régénérer mon QR Code
+            {rotate.isPending ? 'Régénération…' : 'Régénérer mon QR Code'}
           </button>
-        )}
 
-        {mutation.isSuccess && !confirming && (
-          <p className="mt-2 text-sm font-medium text-[var(--cd-green-hover)]">
-            Nouveau QR Code généré. L'ancien ne fonctionne plus.
-          </p>
-        )}
+          {rotate.isSuccess && (
+            <p className="text-[var(--cd-green-hover)]">
+              Nouveau QR Code en place. L'ancien ne fonctionne plus.
+            </p>
+          )}
+
+          {rotate.error instanceof ApiError && (
+            <p className="text-[var(--cd-danger)]">{rotate.error.message}</p>
+          )}
+        </div>
       </div>
     </section>
   )

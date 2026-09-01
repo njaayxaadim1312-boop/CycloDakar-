@@ -427,11 +427,45 @@ Autres décisions :
 
 ---
 
-## ⏳ Phase 11 — QR Code
+## ✅ Phase 11 — QR Code *(terminée)*
 
-Jeton opaque par membre (aucune donnée personnelle dans le QR), génération SVG,
-rotation en cas de compromission, scanner mobile (`expo-camera`),
-`GET /members/resolve/{token}`.
+**Backend**
+
+- `GET /members/{uuid}/qr` : image **SVG**, nette à toutes les tailles et
+  imprimable sur une carte de membre. Jamais mise en cache — un jeton peut
+  être révoqué à tout moment, et une image en cache afficherait un code devenu
+  invalide.
+- `GET /members/resolve/{token}` : retrouve un membre à partir d'un scan.
+  **Réservé aux collecteurs**, limité en débit.
+
+Deux exigences gouvernent ce module :
+
+1. **Le QR ne contient aucune donnée personnelle.** Ni nom, ni téléphone, ni
+   matricule, ni même l'uuid : le préfixe `CD:` suivi d'un jeton opaque de
+   43 caractères, et rien d'autre. Un QR photographié dans la rue ne dit rien
+   de son porteur. C'est aussi ce qui rend le jeton **révocable** : le
+   compromettre ne coûte qu'une rotation.
+2. **Le scan n'est pas un annuaire.** La réponse porte l'identité minimale —
+   nom, matricule, statut — et jamais le téléphone ni l'adresse. Reconnaître
+   quelqu'un, pas aspirer le fichier des membres un QR à la fois.
+
+Correction d'erreur en niveau **Q** (25 %) : ces codes passeront des mois dans
+un portefeuille avant d'être scannés au bord d'une route poussiéreuse.
+
+**Web** — le QR s'affiche sur « Mon compte », sur fond blanc obligatoire (un QR
+sur fond sombre n'est pas lu), avec le bouton de régénération.
+
+**Mobile** — même affichage, plus l'**écran de scan** (`expo-camera`). Un
+verrou hors état React empêche dix requêtes pour un seul scan : une caméra
+émet plusieurs lectures par seconde du même code. Le bouton n'apparaît que
+pour les collecteurs.
+
+**Vérifié** — backend : **323 tests / 959 assertions** (15 nouveaux, dont
+« le QR ne contient aucune donnée personnelle » et la limite de débit).
+Mobile : 61 tests. Web : `tsc -b`, build, rendu headless.
+
+**Reporté** — l'action « Encaisser » depuis le scan : phase 12. C'est elle qui
+justifie tout ce module, et le point d'accroche est marqué dans l'écran.
 
 ---
 

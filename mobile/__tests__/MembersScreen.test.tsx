@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { MembersScreen } from '../src/screens/MembersScreen'
-import { aMember, aSearchResult, mockApi, renderScreen } from './helpers'
+import { aMember, aSearchResult, aUser, mockApi, renderScreen } from './helpers'
+import { useAuth } from '../src/stores/auth'
 
 /**
  * Annuaire mobile.
@@ -37,7 +38,7 @@ describe('MembersScreen', () => {
       },
     })
 
-    await renderScreen(<MembersScreen onOpenMember={jest.fn()} />)
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
 
     expect(await screen.findByText('Khadim Ndiaye')).toBeOnTheScreen()
     expect(screen.getByText('Aminata Cisse')).toBeOnTheScreen()
@@ -49,7 +50,7 @@ describe('MembersScreen', () => {
       '/members': { data: [], meta: { current_page: 1, last_page: 1, per_page: 100, total: 0, has_more: false } },
     })
 
-    await renderScreen(<MembersScreen onOpenMember={jest.fn()} />)
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
 
     await fireEvent.changeText(
       screen.getByLabelText('Rechercher un membre'),
@@ -74,7 +75,7 @@ describe('MembersScreen', () => {
       '/members': { data: [], meta: { current_page: 1, last_page: 1, per_page: 100, total: 0, has_more: false } },
     })
 
-    await renderScreen(<MembersScreen onOpenMember={jest.fn()} />)
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
     const input = screen.getByLabelText('Rechercher un membre')
 
     for (const value of ['K', 'Kh', 'Kha', 'Khad', 'Khadi', 'Khadim']) {
@@ -96,7 +97,7 @@ describe('MembersScreen', () => {
       '/members': { data: [], meta: { current_page: 1, last_page: 1, per_page: 100, total: 0, has_more: false } },
     })
 
-    await renderScreen(<MembersScreen onOpenMember={jest.fn()} />)
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
     await fireEvent.changeText(screen.getByLabelText('Rechercher un membre'), 'Zzz')
 
     // `findBy` et non `getBy` : la saisie est differee de 350 ms, le message
@@ -115,7 +116,7 @@ describe('MembersScreen', () => {
     })
 
     const onOpenMember = jest.fn()
-    await renderScreen(<MembersScreen onOpenMember={onOpenMember} />)
+    await renderScreen(<MembersScreen onOpenMember={onOpenMember} onScan={jest.fn()} />)
 
     await fireEvent.press(await screen.findByText('Khadim Ndiaye'))
 
@@ -129,10 +130,51 @@ describe('MembersScreen', () => {
       new Error('offline'),
     )
 
-    await renderScreen(<MembersScreen onOpenMember={jest.fn()} />)
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
 
     expect(
       await screen.findByText(/L'annuaire n'a pas pu être chargé/),
     ).toBeOnTheScreen()
+  })
+
+  it("n'offre pas le scan a un membre ordinaire", async () => {
+    // Identifier quelqu'un n'est pas le geste d'un membre, et des la phase 12
+    // cela permettra d'encaisser en son nom. Montrer une porte fermee
+    // n'apprendrait rien.
+    useAuth.setState({ user: aUser({ role: 'MEMBER' }), ready: true })
+    mockApi({
+      '/members': {
+        data: [aMember()],
+        meta: { current_page: 1, last_page: 1, per_page: 20, total: 1, has_more: false },
+      },
+    })
+
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={jest.fn()} />)
+    await screen.findByText('Khadim Ndiaye')
+
+    expect(screen.queryByLabelText('Scanner un QR Code')).toBeNull()
+  })
+
+  it('offre le scan a un collecteur', async () => {
+    useAuth.setState({
+      user: aUser({
+        role: 'COLLECTOR',
+        abilities: { collect: true, manage_finance: false, administer: false },
+      }),
+      ready: true,
+    })
+    mockApi({
+      '/members': {
+        data: [aMember()],
+        meta: { current_page: 1, last_page: 1, per_page: 20, total: 1, has_more: false },
+      },
+    })
+
+    const onScan = jest.fn()
+    await renderScreen(<MembersScreen onOpenMember={jest.fn()} onScan={onScan} />)
+
+    await fireEvent.press(await screen.findByLabelText('Scanner un QR Code'))
+
+    expect(onScan).toHaveBeenCalled()
   })
 })

@@ -15,8 +15,10 @@ use App\Http\Resources\MemberResource;
 use App\Models\Member;
 use App\Services\AuditLogger;
 use App\Services\MemberService;
+use App\Services\QrCodeGenerator;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -156,6 +158,93 @@ final class MemberController extends Controller
         }
 
         return ApiResponse::ok($member->fresh()->weeklyGoals());
+    }
+
+    /**
+     * Image du QR Code d'un membre.
+     *
+     * Renvoyee en SVG : nette a toutes les tailles, y compris imprimee sur
+     * une carte de membre, et quelques kilo-octets a peine.
+     *
+     * Meme droit que la fiche : un QR permet d'encaisser au nom de son
+     * porteur des la phase 12, il ne se distribue donc pas librement.
+     */
+    public function qrCode(Request $request, Member $member, QrCodeGenerator $qr): Response
+    {
+        $this->authorize('view', $member);
+
+        return response($qr->svg($member), 200, [
+            'Content-Type' => 'image/svg+xml; charset=utf-8',
+            // Le jeton peut etre revoque a tout moment : une image en cache
+            // afficherait un QR devenu invalide, et le membre ne comprendrait
+            // pas pourquoi il n'est plus reconnu.
+            'Cache-Control' => 'no-store, must-revalidate',
+        ]);
+    }
+
+    /**
+     * Retrouve un membre a partir d'un QR scanne.
+     *
+     * C'est le geste du terrain : un collecteur scanne, l'application lui dit
+     * QUI est en face. La reponse est volontairement MINIMALE — identite,
+     * matricule, statut — et non la fiche complete : un scan doit permettre
+     * de reconnaitre quelqu'un, pas d'aspirer l'annuaire un QR a la fois.
+     *
+     * Reservee aux collecteurs et au-dessus, et limitee en debit : sans cela,
+     * l'API deviendrait un oracle permettant d'eprouver des jetons au hasard.
+     */
+    public function resolveQr(Request $request, string $token, QrCodeGenerator $qr): JsonResponse
+    {
+        if (! $request->user()->role->canCollect()) {
+            return ApiResponse::error(
+                message: "Le scan des QR Codes est reserve aux collecteurs.",
+                status: 403,
+                code: 'FORBIDDEN',
+            );
+        }
+
+        // On verifie la FORME avant d'interroger la base : un contenu qui
+        // n'est pas un jeton du club ne merite pas une requete SQL.
+        $clean = $qr->extractToken($token);
+
+        if ($clean === null) {
+            return ApiResponse::error(
+                message: "Ce code ne vient pas de Cyclo Dakar.",
+                status: 422,
+                code: 'INVALID_QR',
+            );
+        }
+
+        $member = Member::query()->where('qr_token', $clean)->first();
+
+        if ($member === null) {
+            /*
+             | Meme message que pour un code mal forme ? Non : ici le code EST
+             | valide dans sa forme, et le membre a besoin de savoir que son
+             | QR a ete revoque plutot que de croire a une panne. Le risque
+             | d'enumeration est nul — deviner 43 caracteres au hasard est
+             | hors de portee, et la limite de debit s'en charge.
+             */
+            return ApiResponse::error(
+                message: "Ce QR Code n'est plus valide. Le membre doit en regenerer un.",
+                status: 404,
+                code: 'QR_NOT_FOUND',
+            );
+        }
+
+        return ApiResponse::ok([
+            'uuid' => $member->uuid,
+            'matricule' => $member->matricule,
+            'full_name' => $member->fullName(),
+            'initials' => $member->initials(),
+            'photo_url' => $member->photoUrl(),
+            'status' => $member->status->value,
+            'status_label' => $member->status->label(),
+            // Un collecteur doit savoir tout de suite s'il a en face de lui
+            // un membre a jour : un ancien membre ne se voit pas reclamer
+            // une cotisation.
+            'is_active' => $member->status === MemberStatus::Active,
+        ]);
     }
 
     public function show(Member $member): JsonResponse

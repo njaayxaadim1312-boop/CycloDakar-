@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useState } from 'react'
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,7 +17,7 @@ import { Avatar } from '../components/Avatar'
 import { MemberStatusBadge, RoleBadge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Field } from '../components/Field'
-import { ApiError, postData } from '../lib/api'
+import { API_URL, ApiError, postData, tokenStore } from '../lib/api'
 import { fetchMyMember, rotateQrCode } from '../lib/members'
 import { useAuth, useCurrentUser } from '../stores/auth'
 import { fontSize, radius, spacing } from '../theme/tokens'
@@ -202,10 +203,16 @@ function QrCard({ uuid }: { uuid: string }) {
   const { colors } = useTheme()
   const queryClient = useQueryClient()
 
+  /** Version de l'image, incrementee a chaque rotation du jeton. */
+  const [version, setVersion] = useState(0)
+
   const mutation = useMutation({
     mutationFn: () => rotateQrCode(uuid),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['member', 'me'] })
+      // Sans ce changement d'URL, le telephone garderait l'ancienne image
+      // en cache et le membre presenterait un code revoque sans le savoir.
+      setVersion((n) => n + 1)
       Alert.alert('QR Code régénéré', "L'ancien QR Code ne fonctionne plus.")
     },
   })
@@ -228,8 +235,29 @@ function QrCard({ uuid }: { uuid: string }) {
       <Text style={[styles.cardTitle, { color: colors.text }]}>Mon QR Code</Text>
       <Text style={[styles.cardSub, { color: colors.textMuted }]}>
         Il permet au collecteur de vous identifier en un scan. Il ne contient
-        aucune donnée personnelle. Son affichage arrive en phase 11.
+        aucune donnée personnelle : ni votre nom, ni votre téléphone, seulement
+        un jeton que le club seul sait interpréter.
       </Text>
+
+      {/*
+        Fond blanc obligatoire, et pose sur la carte plutot que dans le fond
+        de l'ecran : un QR sur fond sombre n'est pas lu par la plupart des
+        appareils, et le mode sombre l'aurait rendu invisible.
+
+        L'image vient du SERVEUR : la meme sur le web, sur le mobile et a
+        l'impression. Une bibliotheque embarquee en produirait une seconde,
+        qu'il faudrait garder identique a la premiere.
+      */}
+      <View style={styles.qrFrame}>
+        <Image
+          source={{
+            uri: `${API_URL}/members/${uuid}/qr?v=${version}`,
+            headers: { Authorization: `Bearer ${tokenStore.get() ?? ''}` },
+          }}
+          style={styles.qrImage}
+          accessibilityLabel="Votre QR Code personnel"
+        />
+      </View>
 
       <Button
         title="Régénérer mon QR Code"
@@ -362,6 +390,16 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  qrFrame: {
+    alignSelf: 'center',
+    // Blanc en dur, et non un jeton de theme : un QR doit rester sur fond
+    // clair meme en mode sombre, sinon les lecteurs ne le trouvent pas.
+    backgroundColor: '#FFFFFF',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginTop: spacing.md,
+  },
+  qrImage: { width: 200, height: 200 },
   safe: { flex: 1 },
   flex: { flex: 1 },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },

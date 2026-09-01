@@ -1,5 +1,6 @@
 import { api, getData, postData } from './api'
 import type {
+  MemberStatusCode,
   Member,
   MemberFilters,
   MemberSearchResult,
@@ -56,4 +57,32 @@ export function rotateQrCode(
   uuid: string,
 ): Promise<{ qr_token: string; qr_rotated_at: string | null }> {
   return postData(`/members/${uuid}/rotate-qr`)
+}
+
+/**
+ * Un membre reconnu par son QR Code.
+ *
+ * Volontairement MINIMAL : reconnaitre quelqu'un, pas aspirer l'annuaire un
+ * QR a la fois. Ni telephone, ni adresse, ni date de naissance.
+ */
+export interface ScannedMember {
+  uuid: string
+  matricule: string
+  full_name: string
+  initials: string
+  photo_url: string | null
+  status: MemberStatusCode
+  status_label: string
+  is_active: boolean
+}
+
+/**
+ * Retrouve un membre a partir du contenu scanne.
+ *
+ * Le contenu part tel quel : c'est le SERVEUR qui decide si le code vient du
+ * club. Filtrer ici en plus donnerait deux verdicts a tenir a jour, et le
+ * client n'est de toute facon jamais cru.
+ */
+export function resolveQrCode(scanned: string): Promise<ScannedMember> {
+  return getData<ScannedMember>(`/members/resolve/${encodeURIComponent(scanned)}`)
 }

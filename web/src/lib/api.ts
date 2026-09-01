@@ -91,7 +91,16 @@ export const tokenStore = {
  * `php artisan serve` (voir vite.config.ts), donc une seule origine, pas de
  * CORS. En production, on pointe l'URL complète de l'API.
  */
-const baseURL = import.meta.env.VITE_API_URL ?? '/api/v1'
+/**
+ * Base de l'API.
+ *
+ * Exportee parce que certaines ressources ne passent pas par axios : l'image
+ * du QR Code est chargee par une balise `<img>`, qui a besoin de l'URL
+ * complete. La deduire ailleurs ferait deux verites a tenir a jour.
+ */
+export const API_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
+
+const baseURL = API_URL
 
 export const api: AxiosInstance = axios.create({
   baseURL,

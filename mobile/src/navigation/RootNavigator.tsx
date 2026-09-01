@@ -11,6 +11,7 @@ import { EventsScreen } from '../screens/events/EventsScreen'
 import { HomeScreen } from '../screens/HomeScreen'
 import { MemberDetailScreen } from '../screens/MemberDetailScreen'
 import { MembersScreen } from '../screens/MembersScreen'
+import { ScanScreen } from '../screens/ScanScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { TrackingNavigator } from './TrackingNavigator'
 import { SystemStatusScreen } from '../screens/SystemStatusScreen'
@@ -50,6 +51,7 @@ export type EventsStackParams = {
 export type MembersStackParams = {
   MembersList: undefined
   MemberDetail: { uuid: string }
+  Scan: undefined
 }
 
 export type ProfileStackParams = {
@@ -140,6 +142,18 @@ function MembersNavigator() {
         {({ navigation }) => (
           <MembersScreen
             onOpenMember={(uuid) => navigation.navigate('MemberDetail', { uuid })}
+            onScan={() => navigation.navigate('Scan')}
+          />
+        )}
+      </MembersStack.Screen>
+
+      {/* Le scan vit dans la pile des membres : il sert a en identifier un,
+          et son resultat mene a sa fiche. */}
+      <MembersStack.Screen name="Scan">
+        {({ navigation }) => (
+          <ScanScreen
+            onBack={() => navigation.goBack()}
+            onOpenMember={(uuid) => navigation.replace('MemberDetail', { uuid })}
           />
         )}
       </MembersStack.Screen>

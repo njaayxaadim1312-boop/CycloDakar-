@@ -131,6 +131,14 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 ->middleware('throttle:qr-scan')
                 ->name('search');
 
+            // Resolution d'un QR scanne — PHASE 11. Declaree AVANT /{member}
+            // pour que « resolve » ne soit pas pris pour un uuid. Meme limite
+            // de debit que la recherche : sans elle, l'API deviendrait un
+            // oracle permettant d'eprouver des jetons au hasard.
+            Route::get('/resolve/{token}', [MemberController::class, 'resolveQr'])
+                ->middleware('throttle:qr-scan')
+                ->name('resolve');
+
             Route::get('/', [MemberController::class, 'index'])->name('index');
             Route::post('/', [MemberController::class, 'store'])->name('store');
 
@@ -142,6 +150,9 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::post('/{member}/role', [MemberController::class, 'updateRole'])->name('role');
             Route::post('/{member}/rotate-qr', [MemberController::class, 'rotateQrCode'])->name('rotate-qr');
+
+            // Image du QR, en SVG — PHASE 11.
+            Route::get('/{member}/qr', [MemberController::class, 'qrCode'])->name('qr');
         });
 
         /*
