@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ActivityController;
 use App\Http\Controllers\Api\V1\ConfigController;
+use App\Http\Controllers\Api\V1\EventController;
+use App\Http\Controllers\Api\V1\EventParticipationController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\StatsController;
@@ -165,6 +167,45 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/{activity}/finalize', [ActivityController::class, 'finalize'])
                 ->middleware('throttle:gps-sync')
                 ->name('finalize');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Evenements — PHASE 9
+        |----------------------------------------------------------------------
+        |
+        | Les sorties officielles du club. Trois cercles de droits, portes par
+        | EventPolicy : tout membre voit et s'inscrit, un collecteur cree et
+        | pointe, seul l'auteur ou un administrateur modifie et annule.
+        |
+        | Le changement d'etat a sa PROPRE route : publier, demarrer ou annuler
+        | sont des actes soumis a des transitions, pas des champs que l'on
+        | modifie au passage.
+        |
+        */
+        Route::prefix('events')->name('events.')->group(function (): void {
+            Route::get('/', [EventController::class, 'index'])->name('index');
+            Route::post('/', [EventController::class, 'store'])->name('store');
+
+            Route::get('/{event}', [EventController::class, 'show'])->name('show');
+            Route::patch('/{event}', [EventController::class, 'update'])->name('update');
+            Route::patch('/{event}/status', [EventController::class, 'updateStatus'])
+                ->name('status');
+            Route::delete('/{event}', [EventController::class, 'destroy'])->name('destroy');
+
+            // Inscription et desistement : le membre vient de la SESSION, on
+            // ne s'inscrit jamais a la place d'un autre.
+            Route::post('/{event}/register', [EventParticipationController::class, 'register'])
+                ->name('register');
+            Route::delete('/{event}/register', [EventParticipationController::class, 'cancel'])
+                ->name('unregister');
+
+            Route::get('/{event}/participants', [EventParticipationController::class, 'index'])
+                ->name('participants');
+
+            // Pointage : reserve aux collecteurs et au-dessus (EventPolicy).
+            Route::post('/{event}/attendance', [EventParticipationController::class, 'attendance'])
+                ->name('attendance');
         });
 
         /*

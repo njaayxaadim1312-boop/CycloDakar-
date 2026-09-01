@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\ActivityStatus;
+use App\Enums\EventStatus;
+use App\Enums\RegistrationStatus;
 use App\Enums\MemberStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
+use App\Models\Event;
+use App\Models\EventParticipant;
 use App\Models\Member;
 use App\Services\Gps\PersonalStatsService;
 use App\Support\ApiResponse;
@@ -68,9 +72,11 @@ final class StatsController extends Controller
             // Les activités sont mesurables depuis la phase 6.
             'activities' => $this->activityStats(),
 
+            // Les événements sont mesurables depuis la phase 9.
+            'events' => $this->eventStats($request),
+
             // Modules à venir. `available: false` et non 0 : voir le
             // commentaire de classe.
-            'events' => $this->pending(9),
             'participations' => $this->pending(10),
             'finance' => $this->financeStats($request),
 
@@ -109,6 +115,50 @@ final class StatsController extends Controller
             'distance_m' => (int) ($row->distance_m ?? 0),
             'moving_time_s' => (int) ($row->moving_time_s ?? 0),
             'this_month' => $thisMonth,
+        ];
+    }
+
+    /**
+     * Sorties officielles du club.
+     *
+     * Le compte des sorties à venir ne tient pas compte des brouillons : un
+     * membre verrait « 3 sorties prévues » sans en trouver que deux, et ne
+     * comprendrait pas où est passée la troisième.
+     *
+     * @return array<string, mixed>
+     */
+    private function eventStats(Request $request): array
+    {
+        $upcoming = Event::query()->upcoming()->count();
+
+        $nextEvent = Event::query()
+            ->upcoming()
+            ->orderBy('starts_at')
+            ->first(['uuid', 'title', 'starts_at', 'location_name']);
+
+        $myUpcoming = null;
+        $member = $request->user()->member;
+
+        if ($member !== null) {
+            $myUpcoming = EventParticipant::query()
+                ->where('member_id', $member->id)
+                ->where('registration_status', RegistrationStatus::Registered)
+                ->whereHas('event', fn ($q) => $q
+                    ->where('starts_at', '>=', now())
+                    ->whereIn('status', [EventStatus::Published, EventStatus::Ongoing]))
+                ->count();
+        }
+
+        return [
+            'available' => true,
+            'upcoming' => $upcoming,
+            'my_upcoming' => $myUpcoming,
+            'next' => $nextEvent === null ? null : [
+                'uuid' => $nextEvent->uuid,
+                'title' => $nextEvent->title,
+                'starts_at' => $nextEvent->starts_at?->toIso8601String(),
+                'location_name' => $nextEvent->location_name,
+            ],
         ];
     }
 
