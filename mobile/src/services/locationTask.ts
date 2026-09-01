@@ -141,8 +141,24 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
       moyennePrecision(anchor?.accuracy_m ?? null, candidate.accuracyM),
     )
 
-    const reelDeplacement = reference !== null && outcome.distanceM >= threshold
-    const moving = !isPaused && reelDeplacement && isMoving(outcome.speedMps, thresholds)
+    /*
+     * Deux raisons de ne rien compter, et de GARDER l'ancre.
+     *
+     * 1. Le deplacement est sous le seuil : c'est le tremblement du GPS.
+     *
+     * 2. Il est trop LENT pour en etre un. Le seuil de distance seul ne
+     *    suffit pas : un recepteur immobile ne tremble pas au hasard, il
+     *    DERIVE lentement de plusieurs metres par minute. La derive finit
+     *    donc par franchir n'importe quel seuil, l'ancre suit, et le cycle
+     *    recommence — 50 m accumules en cinq minutes sur une table. La
+     *    vitesse tranche : 10 m en 60 s font 0,17 m/s, ce qui n'est ni
+     *    rouler ni marcher.
+     */
+    const assezLoin = reference !== null && outcome.distanceM >= threshold
+    const assezVite = isMoving(outcome.speedMps, thresholds)
+
+    const reelDeplacement = assezLoin && assezVite
+    const moving = !isPaused && reelDeplacement
 
     await appendPoint(
       {
@@ -181,7 +197,16 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
      */
     if (isPaused) {
       anchor = null
-    } else if (reelDeplacement || anchor === null) {
+    } else if (reelDeplacement || anchor === null || (assezLoin && !assezVite)) {
+      /*
+       * L'ancre avance sur un deplacement reel, mais AUSSI quand c'est la
+       * lenteur qui a tranche : une derive repartira de sa nouvelle position
+       * sans rien accumuler, et surtout un ARRET REEL suivi d'un depart ne
+       * verra pas son temps credite au premier segment parcouru.
+       *
+       * Le tremblement vif, lui, garde l'ancre : c'est le seuil de distance
+       * qui l'a rejete, et il faut continuer d'accumuler la preuve.
+       */
       anchor = {
         lat: candidate.lat,
         lng: candidate.lng,
@@ -287,6 +312,18 @@ export async function stopLocationUpdates(): Promise<void> {
 }
 
 /**
+ * Combien de fois la precision annoncee un deplacement doit-il valoir pour
+ * etre credible ?
+ *
+ * Deux points donnes chacun a plus ou moins 8 m peuvent se trouver a 16 m l'un
+ * de l'autre sans que personne n'ait bouge. Mesure : 1,5 laissait passer 13 m
+ * en cinq minutes sur une table ; 2,0 n'en laisse aucun.
+ *
+ * Miroir de `cyclo.gps.accuracy_factor`.
+ */
+const ACCURACY_FACTOR = 2.0
+
+/**
  * Incertitude combinee de deux points, en metres.
  *
  * Deux points annonces a plus ou moins 10 m peuvent se trouver a 20 m l'un de
@@ -298,5 +335,5 @@ function moyennePrecision(a: number | null, b: number | null): number {
 
   if (valeurs.length === 0) return 0
 
-  return valeurs.reduce((somme, v) => somme + v, 0) / valeurs.length
+  return (valeurs.reduce((somme, v) => somme + v, 0) / valeurs.length) * ACCURACY_FACTOR
 }

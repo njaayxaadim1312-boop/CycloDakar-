@@ -212,6 +212,47 @@ final class ActivityStatsCalculator
 
             $speed = $segment / $elapsed;
 
+            /*
+             | Trop lent pour etre un deplacement.
+             |
+             | Le seuil de distance seul ne suffit pas : un recepteur immobile
+             | ne tremble pas au hasard, il DERIVE lentement, de plusieurs
+             | metres en une minute. La derive finit donc par franchir
+             | n'importe quel seuil de distance, l'ancre suit, et le cycle
+             | recommence — 50 m accumules en cinq minutes sur une table.
+             |
+             | La vitesse tranche : 10 m parcourus en 60 s font 0,17 m/s.
+             | Personne ne roule ni ne marche a cette allure. On ignore le
+             | point ET ON GARDE L'ANCRE, sans quoi la derive repartirait de
+             | sa nouvelle position.
+             |
+             | Un cycliste sous 0,8 m/s pousse son velo : ne pas compter ces
+             | metres est coherent avec le « temps en mouvement », qui les
+             | exclut deja.
+             */
+            if ($speed < $idleSpeed) {
+                /*
+                 | ICI l'ancre AVANCE, contrairement au cas precedent.
+                 |
+                 | Cette lenteur peut venir de deux situations, et l'ancre
+                 | doit suivre dans les deux :
+                 |
+                 |  - une derive : les points suivants repartiront de la
+                 |    nouvelle position, sans jamais rien accumuler puisque
+                 |    la derive reste lente ;
+                 |  - un ARRET REEL suivi d'un depart. Si l'ancre restait
+                 |    figee, le temps de l'arret finirait par etre credite au
+                 |    premier segment roule — un feu rouge de trois minutes
+                 |    compte comme du temps actif.
+                 |
+                 | Le tremblement vif, lui, reste bloque par le seuil de
+                 | distance au-dessus, qui garde l'ancre.
+                 */
+                $anchor = $current;
+
+                continue;
+            }
+
             $smoothedSpeed = $smoothedSpeed === null
                 ? $speed
                 // Lissage exponentiel : reactif aux vraies accelerations,
@@ -220,15 +261,14 @@ final class ActivityStatsCalculator
 
             $distance += $segment;
 
-            // Le temps actif exclut les moments passes sous la vitesse de
-            // marche lente : feux rouges, ravitaillements, photos.
-            if ($speed >= $idleSpeed) {
-                $movingTime += $elapsed;
-                $maxSpeed = max($maxSpeed, $smoothedSpeed);
+            // Tout ce qui parvient ici depasse la vitesse de marche lente :
+            // les feux rouges, ravitaillements et photos ont ete ecartes
+            // au-dessus, avec la derive.
+            $movingTime += $elapsed;
+            $maxSpeed = max($maxSpeed, $smoothedSpeed);
 
-                $bucket = (string) (int) floor($speed * 3.6 / 5) * 5;
-                $histogram[$bucket] = ($histogram[$bucket] ?? 0) + 1;
-            }
+            $bucket = (string) (int) floor($speed * 3.6 / 5) * 5;
+            $histogram[$bucket] = ($histogram[$bucket] ?? 0) + 1;
 
             // Splits kilometriques.
             $splitDistance += $segment;
@@ -323,7 +363,18 @@ final class ActivityStatsCalculator
             return 0.0;
         }
 
-        return array_sum($accuracies) / count($accuracies);
+        /*
+         | Facteur 1,5, et non 1.
+         |
+         | Deux points annonces chacun a plus ou moins 8 m peuvent se trouver
+         | a 16 m l'un de l'autre sans que personne n'ait bouge. Prendre la
+         | simple moyenne laissait passer une derive de 10 m sous une
+         | precision de 8 m : le telephone pose accumulait encore 25 m en
+         | cinq minutes.
+         */
+        $facteur = (float) config('cyclo.gps.accuracy_factor', 2.0);
+
+        return (array_sum($accuracies) / count($accuracies)) * $facteur;
     }
 
     private function calories(Sport $sport, int $movingTimeS, ?float $weightKg): ?int

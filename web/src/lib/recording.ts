@@ -38,6 +38,20 @@ import type { SportCode } from '@/types/api'
  */
 
 /**
+ * Combien de fois la précision annoncée un déplacement doit-il valoir pour
+ * être crédible ?
+ *
+ * Deux points donnés chacun à ±8 m peuvent se trouver à 16 m l'un de l'autre
+ * sans que personne n'ait bougé : le facteur 1 serait naïf. Mesuré sur traces
+ * synthétiques (téléphone posé, dérive de 10 m sur 5 min) — 1,5 laissait
+ * encore passer 13 m ; 2,0 n'en laisse aucun sans rien coûter aux vraies
+ * sorties ; 2,5 dégraderait la marche de 4 à 8 % d'erreur.
+ *
+ * Miroir de `cyclo.gps.accuracy_factor`.
+ */
+const ACCURACY_FACTOR = 2.0
+
+/**
  * Incertitude combinée de deux points, en mètres.
  *
  * Deux points annoncés à ±10 m peuvent se trouver à 20 m l'un de l'autre sans
@@ -49,7 +63,7 @@ function averageAccuracy(a: number | null, b: number | null): number {
 
   if (values.length === 0) return 0
 
-  return values.reduce((sum, value) => sum + value, 0) / values.length
+  return (values.reduce((sum, value) => sum + value, 0) / values.length) * ACCURACY_FACTOR
 }
 
 /** Taille maximale d'un lot, imposée par l'API (`StorePointsRequest`). */
@@ -266,10 +280,53 @@ export class RecordingSession {
       averageAccuracy(this.anchorAccuracyM, candidate.accuracyM),
     )
 
-    if (this.anchor !== null && outcome.distanceM < threshold) {
-      // Sous le seuil : on garde l'ancre. Le point est tout de même transmis
-      // au serveur — il décrit où l'on était, et le serveur refiltrera.
+    /*
+     * Deux raisons de ne rien compter, et de GARDER l'ancre.
+     *
+     * 1. Le déplacement est sous le seuil : c'est le tremblement du GPS.
+     *
+     * 2. Il est trop LENT pour en être un. Le seuil de distance seul ne
+     *    suffit pas : un récepteur immobile ne tremble pas au hasard, il
+     *    dérive lentement de plusieurs mètres par minute. La dérive finit
+     *    donc par franchir n'importe quel seuil de distance, l'ancre suit, et
+     *    le cycle recommence — 50 m accumulés en cinq minutes sur une table.
+     *    La vitesse tranche : 10 m en 60 s font 0,17 m/s, ce qui n'est ni
+     *    rouler ni marcher.
+     */
+    const tooShort = outcome.distanceM < threshold
+    const tooSlow = !isMoving(outcome.speedMps, this.thresholds)
+
+    if (this.anchor !== null && (tooShort || tooSlow)) {
+      // Le point est tout de même transmis : il décrit où l'on était, la
+      // carte en a besoin, et le serveur refiltrera de toute façon.
       this.storePoint(candidate)
+
+      /*
+       * L'ancre AVANCE quand c'est la lenteur qui a tranché, et seulement
+       * dans ce cas.
+       *
+       * Une dérive repartira de sa nouvelle position sans jamais rien
+       * accumuler, puisqu'elle reste lente. Surtout, un ARRÊT RÉEL suivi
+       * d'un départ ne verra pas son temps crédité au premier segment
+       * parcouru — sans quoi un feu rouge de trois minutes compterait comme
+       * du temps actif.
+       *
+       * Le tremblement vif, lui, garde l'ancre : c'est le seuil de distance
+       * qui l'a rejeté, et il faut continuer d'accumuler la preuve d'un
+       * déplacement réel.
+       */
+      if (tooSlow && !tooShort) {
+        this.anchor = {
+          lat: candidate.lat,
+          lng: candidate.lng,
+          timestampMs: candidate.timestampMs,
+          altitudeM: candidate.altitudeM,
+          lastSpeedMps: 0,
+        }
+        this.anchorAccuracyM = candidate.accuracyM
+        this.smoothedSpeed = 0
+        this.stats.currentSpeedMps = 0
+      }
 
       return true
     }
@@ -280,11 +337,10 @@ export class RecordingSession {
     this.smoothedSpeed = smoothSpeed(this.smoothedSpeed, outcome.speedMps)
 
     if (this.anchor !== null) {
+      // Tout ce qui parvient ici bouge réellement : la dérive et les arrêts
+      // ont été écartés au-dessus.
       this.stats.distanceM += outcome.distanceM
-
-      if (isMoving(this.smoothedSpeed, this.thresholds)) {
-        this.movingMs += outcome.elapsedMs
-      }
+      this.movingMs += outcome.elapsedMs
 
       if (this.smoothedSpeed > this.stats.maxSpeedMps) {
         this.stats.maxSpeedMps = this.smoothedSpeed

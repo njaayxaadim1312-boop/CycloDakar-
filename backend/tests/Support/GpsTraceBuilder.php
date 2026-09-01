@@ -237,6 +237,41 @@ final class GpsTraceBuilder
         return $this;
     }
 
+    /**
+     * Un telephone POSE, dont le GPS derive.
+     *
+     * Un recepteur a l'arret ne rend pas deux fois la meme position : il erre
+     * lentement, souvent de 3 a 10 m, en suivant les satellites qui passent.
+     * Cette derive lente est plus perfide qu'un bruit vif — elle finit par
+     * franchir n'importe quel seuil de DISTANCE, et seule la vitesse la
+     * demasque.
+     *
+     * @param  int  $seconds  duree de l'arret
+     * @param  float  $driftM  amplitude de l'errance, en metres
+     */
+    public function stationaryDrift(int $seconds, float $driftM = 8.0): self
+    {
+        $baseLat = $this->lat;
+        $baseLng = $this->lng;
+
+        for ($t = 0; $t < $seconds; $t++) {
+            $dLat = (sin($t / 17) + sin($t / 6.3)) * ($driftM / 2);
+            $dLng = (cos($t / 11) + sin($t / 4.7)) * ($driftM / 2);
+
+            $this->lat = $baseLat + $dLat / self::METERS_PER_DEGREE_LAT;
+            $this->lng = $baseLng
+                + $dLng / (self::METERS_PER_DEGREE_LAT * cos(deg2rad($baseLat)));
+
+            $this->clock = $this->clock->addSecond();
+            $this->push(8.0);
+        }
+
+        $this->lat = $baseLat;
+        $this->lng = $baseLng;
+
+        return $this;
+    }
+
     /** Répète les N derniers points à l'identique (rejeu d'un lot). */
     public function duplicateLast(int $count): self
     {

@@ -118,6 +118,32 @@ final class WalkingDistanceTest extends TestCase
     }
 
     #[Test]
+    public function un_telephone_pose_n_accumule_rien_quel_que_soit_le_sport(): void
+    {
+        /*
+         | Le defaut signale : « je demarre en cyclisme, je suis sur place, il
+         | m'affiche deja 67 m ».
+         |
+         | La derive lente est plus perfide qu'un bruit vif : elle finit par
+         | franchir n'importe quel seuil de DISTANCE, l'ancre suit, et le
+         | cycle recommence. Seule la vitesse la demasque — 10 m en 60 s font
+         | 0,17 m/s, ce qui n'est ni rouler ni marcher.
+         */
+        $points = GpsTraceBuilder::make()->stationaryDrift(seconds: 300, driftM: 10.0)->build();
+
+        foreach (Sport::cases() as $sport) {
+            $stats = $this->calculator()->calculate($points, $sport);
+
+            $this->assertSame(
+                0,
+                $stats['distance_m'],
+                "Telephone immobile en {$sport->value} : {$stats['distance_m']} m accumules.",
+            );
+            $this->assertSame(0, $stats['moving_time_s']);
+        }
+    }
+
+    #[Test]
     public function une_sortie_velo_reste_mesuree_fidelement(): void
     {
         // Le correctif ne doit pas rogner les sports rapides : à 6 m/s, chaque

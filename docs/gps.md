@@ -292,3 +292,60 @@ important de l'application.
 | `ActivityStatsCalculator` | 6 tests PHP, dont vélo et course inchangés |
 | `RecordingSession` (web) | 6 assertions — mêmes chiffres que le serveur, 69 m et 0 m |
 | `locationTask` (mobile) | même ancre, même seuil adaptatif |
+
+## Le téléphone posé — corrigé
+
+Signalé juste après : « je démarre en cyclisme, je suis sur place, il m'affiche
+déjà 67 m ».
+
+### Pourquoi l'ancre ne suffisait pas
+
+Un récepteur à l'arrêt ne tremble pas au hasard : il **dérive lentement**, de
+plusieurs mètres par minute, en suivant les satellites qui passent. Cette
+dérive finit donc par franchir n'importe quel seuil de **distance** — l'ancre
+suit, et le cycle recommence.
+
+Mesuré, téléphone posé cinq minutes :
+
+| Dérive | Précision | Avant | Après |
+|---|---|---|---|
+| 4 m | 5 m | 41 m | **0 m** |
+| 6 m | 8 m | 50 m | **0 m** |
+| 10 m | 12 m | 99 m | **0 m** |
+
+### Deux rejets, deux comportements
+
+C'est la distinction qui manquait.
+
+| Rejet | Cause | L'ancre |
+|---|---|---|
+| **Trop court** | tremblement vif du GPS | **reste** — il faut continuer d'accumuler la preuve d'un déplacement réel |
+| **Trop lent** | dérive, ou arrêt réel | **avance** — sinon le temps d'un feu rouge serait crédité au premier segment roulé |
+
+Le second point n'est pas théorique : sans lui, un arrêt de trois minutes
+comptait comme du temps actif. C'est un test existant qui l'a révélé.
+
+La vitesse tranche ce que la distance ne peut pas : 10 m parcourus en 60 s font
+0,17 m/s, ce qui n'est ni rouler ni marcher.
+
+### Le seuil vaut deux fois la précision annoncée
+
+Deux points donnés chacun à ±8 m peuvent se trouver à 16 m l'un de l'autre sans
+que personne n'ait bougé. Le facteur est réglé dans
+`cyclo.gps.accuracy_factor`, et il a été **choisi sur mesure** :
+
+| Facteur | Téléphone posé | Vélo | Marche |
+|---|---|---|---|
+| 1,5 | 13 m | −0,8 % | −4,2 % |
+| **2,0** | **0 m** | **−0,8 %** | **−4,2 %** |
+| 2,5 | 0 m | −1,1 % | −8,3 % |
+
+2,0 élimine la dérive sans rien coûter aux vraies sorties ; 2,5 dégraderait la
+marche pour rien.
+
+### Les seuils du client étaient restés à 1 m
+
+Le serveur utilisait `min_distance_m` par sport, les clients gardaient un
+`minSegmentM: 1` hérité. Ils sont désormais alignés — cyclisme 5 m, course et
+randonnée 3 m, marche 8 m — parce qu'un affichage en direct qui diverge du
+calcul final fait douter du chiffre.

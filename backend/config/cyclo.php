@@ -139,6 +139,23 @@ return [
         'idle_speed_mps' => 0.8,
         'auto_pause_after_s' => 10,
         // Segment plus court que cela : bruit à l'arrêt, non compté.
+        /*
+         | Combien de fois la precision annoncee un deplacement doit-il valoir
+         | pour etre credible ?
+         |
+         | Deux points donnes chacun a plus ou moins 8 m peuvent se trouver a
+         | 16 m l'un de l'autre sans que personne n'ait bouge : le facteur 1
+         | serait naif. Mesure sur traces synthetiques (telephone pose, derive
+         | de 10 m sur 5 min) :
+         |
+         |   facteur 1,5 -> 13 m accumules | velo -0,8 %  marche -4,2 %
+         |   facteur 2,0 ->  0 m           | velo -0,8 %  marche -4,2 %
+         |   facteur 2,5 ->  0 m           | velo -1,1 %  marche -8,3 %
+         |
+         | 2,0 elimine la derive sans rien couter aux vraies sorties.
+         */
+        'accuracy_factor' => 2.0,
+
         'min_segment_m' => 1.0,
         /*
         | Dénivelé — les deux réglages les plus délicats du projet.

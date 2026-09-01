@@ -44,7 +44,9 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxSpeedMps: 25,
     maxAccelerationMps2: 5,
     idleSpeedMps: 0.8,
-    minSegmentM: 1,
+    // Aligne sur `cyclo.sports.CYCLING.min_distance_m` : le client et le
+    // serveur doivent annoncer le meme chiffre.
+    minSegmentM: 5,
     elevationThresholdM: 10,
   },
   RUNNING: {
@@ -52,7 +54,7 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxSpeedMps: 12,
     maxAccelerationMps2: 5,
     idleSpeedMps: 0.8,
-    minSegmentM: 1,
+    minSegmentM: 3,
     elevationThresholdM: 10,
   },
   HIKING: {
@@ -60,7 +62,7 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxSpeedMps: 6,
     maxAccelerationMps2: 5,
     idleSpeedMps: 0.8,
-    minSegmentM: 1,
+    minSegmentM: 3,
     elevationThresholdM: 10,
   },
   /*
