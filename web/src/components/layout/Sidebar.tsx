@@ -2,7 +2,12 @@ import clsx from 'clsx'
 import { X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Logo } from '@/components/Logo'
-import { isDelivered, navigation } from '@/config/navigation'
+import {
+  isDelivered,
+  managementEntry,
+  managementSections,
+  navigation,
+} from '@/config/navigation'
 import { canAccess, useCurrentUser } from '@/stores/auth'
 
 interface SidebarProps {
@@ -16,6 +21,11 @@ interface SidebarProps {
  *
  * Identité orange et blanc : en-tête orange plein portant le logo, surface
  * blanche pour la liste, item actif en orange avec texte noir.
+ *
+ * **Le sport occupe tout le menu.** L'administration et la trésorerie tiennent
+ * dans un unique bouton « Gestion du club », posé en pied, visuellement plus
+ * discret que le reste. Ce n'est pas un rangement : c'est ce qui décide de ce
+ * que le club a l'air d'être quand on ouvre l'application.
  *
  * Le texte de l'item actif est noir et non blanc : #FF8C00 avec du blanc ne
  * donne que 2,5:1 de contraste, illisible ; avec du noir on atteint 7,9:1.
@@ -35,6 +45,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       items: section.items.filter((item) => canAccess(user, item.roles)),
     }))
     .filter((section) => section.items.length > 0)
+
+  // Le bouton de gestion n'apparaît que si son propriétaire a réellement
+  // quelque chose derrière : un membre ordinaire ne doit pas trouver une
+  // porte qui ne mène nulle part.
+  const managementItems = canAccess(user, managementEntry.roles)
+    ? managementSections
+        .flatMap((section) => section.items)
+        .filter((item) => canAccess(user, item.roles))
+    : []
 
   return (
     <>
@@ -83,9 +102,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     <NavLink
                       to={item.to}
                       onClick={onClose}
-                      // `end` sur /finance : sans lui, l'onglet Caisse resterait
-                      // actif quand on est sur /finance/expenses.
-                      end={item.to === '/finance'}
+                      // `end` sur la racine : sans lui, « Accueil » resterait
+                      // actif sur toutes les pages, puisque « / » préfixe tout.
+                      end={item.to === '/'}
                       className={({ isActive }) =>
                         clsx(
                           'flex items-center gap-2.5 rounded-[var(--cd-radius-sm)] px-3 py-2 text-sm font-medium transition-colors',
@@ -131,6 +150,33 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </div>
           ))}
         </nav>
+
+        {/* --- Gestion du club ------------------------------------------------
+            Un seul bouton pour tout ce qui touche à l'argent et à
+            l'administration, en pied de menu et en gris : l'application parle
+            d'abord d'exercice. */}
+        {managementItems.length > 0 && (
+          <div className="border-t border-[var(--cd-border)] px-3 py-3">
+            <NavLink
+              to={managementEntry.to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-2.5 rounded-[var(--cd-radius-sm)] px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-[var(--cd-surface-2)] text-[var(--cd-text)]'
+                    : 'text-[var(--cd-text-muted)] hover:bg-[var(--cd-surface-2)] hover:text-[var(--cd-text)]',
+                )
+              }
+            >
+              <managementEntry.icon size={17} className="shrink-0" />
+              <span className="flex-1 truncate">{managementEntry.label}</span>
+              <span className="shrink-0 text-[0.6875rem] tabular-nums opacity-60">
+                {managementItems.length}
+              </span>
+            </NavLink>
+          </div>
+        )}
 
         {/* --- Pied ---------------------------------------------------------- */}
         <div className="border-t border-[var(--cd-border)] px-4 py-3">

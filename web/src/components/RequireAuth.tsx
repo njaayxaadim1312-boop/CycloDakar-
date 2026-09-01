@@ -64,5 +64,5 @@ export function RedirectIfAuthenticated() {
     return <SplashScreen />
   }
 
-  return user ? <Navigate to="/dashboard" replace /> : <Outlet />
+  return user ? <Navigate to="/" replace /> : <Outlet />
 }

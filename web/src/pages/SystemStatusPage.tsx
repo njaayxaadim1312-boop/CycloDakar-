@@ -1,18 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  Bike,
   CheckCircle2,
   Database,
-  Footprints,
   HardDrive,
-  Mountain,
   RefreshCw,
   Server,
   XCircle,
 } from 'lucide-react'
 import { getData } from '@/lib/api'
+import { SPORT_COLOR, SPORT_ICON } from '@/lib/sports'
 import { formatFcfa } from '@/lib/format'
-import type { AppConfig, Health, SportCode } from '@/types/api'
+import type { AppConfig, Health } from '@/types/api'
 
 /**
  * Diagnostic en direct de l'installation.
@@ -21,18 +19,6 @@ import type { AppConfig, Health, SportCode } from '@/types/api'
  * communiquent — c'est le premier écran à consulter quand quelque chose ne
  * répond plus.
  */
-
-const SPORT_ICONS: Record<SportCode, typeof Bike> = {
-  CYCLING: Bike,
-  RUNNING: Footprints,
-  HIKING: Mountain,
-}
-
-const SPORT_COLORS: Record<SportCode, string> = {
-  CYCLING: 'var(--cd-sport-cycling)',
-  RUNNING: 'var(--cd-sport-running)',
-  HIKING: 'var(--cd-sport-hiking)',
-}
 
 export function SystemStatusPage() {
   const health = useQuery({
@@ -147,7 +133,7 @@ export function SystemStatusPage() {
             </h4>
             <ul className="mt-3 grid gap-3 sm:grid-cols-3">
               {config.data.sports.map((sport) => {
-                const Icon = SPORT_ICONS[sport.code] ?? Bike
+                const Icon = SPORT_ICON[sport.code]
                 return (
                   <li
                     key={sport.code}
@@ -155,7 +141,7 @@ export function SystemStatusPage() {
                   >
                     <span
                       className="flex size-10 shrink-0 items-center justify-center rounded-full"
-                      style={{ backgroundColor: SPORT_COLORS[sport.code], color: '#fff' }}
+                      style={{ backgroundColor: SPORT_COLOR[sport.code], color: '#fff' }}
                     >
                       <Icon size={20} />
                     </span>

@@ -58,6 +58,22 @@
   --cd-sport-cycling: var(--cd-orange);
   --cd-sport-running: var(--cd-blue);
   --cd-sport-hiking: var(--cd-green);
+  /*
+     La marche reprend le bleu de la course, en plus clair : ce sont deux
+     facons de faire le meme geste, et leur donner deux familles de couleur
+     sans rapport rendrait la repartition par sport illisible.
+  */
+  --cd-sport-walking: #3d7ab8;
+
+  /* ---- Anneaux d'activite ------------------------------------------------
+     Trois teintes distinctes, lisibles superposees et distinguables par des
+     yeux daltoniens : orange, bleu, vert sont deja separes en luminance, pas
+     seulement en teinte.
+  */
+  --cd-ring-distance: var(--cd-orange);
+  --cd-ring-time: var(--cd-blue);
+  --cd-ring-activities: var(--cd-green);
+  --cd-ring-track: color-mix(in srgb, currentColor 14%, transparent);
 
   /* ---- Rayons ----------------------------------------------------------- */
   --cd-radius-sm: 8px;
@@ -77,6 +93,37 @@
   --cd-font-display:
     'Archivo', 'Inter Tight', 'Inter', system-ui, -apple-system, 'Segoe UI',
     sans-serif;
+
+  /* ---- Surfaces de verre -------------------------------------------------
+     Posees SUR une image (affiche du club, carte). Le fond translucide seul
+     ne suffit pas : sans le flou, le texte tombe sur les details de la photo
+     et devient illisible des que l'image change. Les deux vont ensemble.
+
+     `--cd-glass-strong` sert aux blocs qui portent du texte long ; le
+     `-soft` aux pastilles et aux bandeaux courts.
+  */
+  --cd-glass: rgb(255 255 255 / 0.72);
+  --cd-glass-strong: rgb(255 255 255 / 0.88);
+  --cd-glass-border: rgb(255 255 255 / 0.5);
+  --cd-glass-blur: 16px;
+
+  /* Verre pose sur une image CLAIRE, ou il faut au contraire assombrir. */
+  --cd-glass-dark: rgb(20 20 22 / 0.55);
+  --cd-glass-dark-border: rgb(255 255 255 / 0.14);
+
+  /* ---- Mouvement ---------------------------------------------------------
+     Trois durees seulement. Au-dela, chaque ecran invente la sienne et
+     l'application perd son rythme.
+
+     `--cd-ease-out` pour ce qui APPARAIT (rapide puis freine, comme un objet
+     qui arrive) ; `--cd-ease-spring` pour ce qui repond a un geste, avec un
+     leger depassement qui donne de la matiere.
+  */
+  --cd-duration-fast: 150ms;
+  --cd-duration: 260ms;
+  --cd-duration-slow: 900ms;
+  --cd-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --cd-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ---- Divers ----------------------------------------------------------- */
   --cd-header-h: 60px;
@@ -118,6 +165,15 @@
   --cd-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --cd-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
   --cd-shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
+
+  /* En sombre, le verre assombrit au lieu d'eclaircir : un panneau blanc
+     translucide sur une photo eblouirait exactement celui qui a choisi le
+     mode sombre. */
+  --cd-glass: rgb(28 28 31 / 0.72);
+  --cd-glass-strong: rgb(28 28 31 / 0.9);
+  --cd-glass-border: rgb(255 255 255 / 0.1);
+
+  --cd-sport-walking: #6aa4d8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -149,5 +205,139 @@
     --cd-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --cd-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
     --cd-shadow-lg: 0 8px 32px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* ==========================================================================
+   MOUVEMENT
+   ==========================================================================
+   Les animations disent quelque chose : d'ou vient un element, ce qui vient
+   de changer, ou en est un objectif. Elles ne decorent pas.
+
+   Tout est desactive sous `prefers-reduced-motion`. Ce n'est pas une
+   politesse : pour une partie des utilisateurs, une animation non sollicitee
+   provoque un vrai malaise physique.
+   ========================================================================== */
+
+@keyframes cd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cd-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cd-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Arrivee d'un bloc de contenu. */
+.cd-rise {
+  animation: cd-rise var(--cd-duration) var(--cd-ease-out) both;
+}
+
+.cd-fade {
+  animation: cd-fade var(--cd-duration) var(--cd-ease-out) both;
+}
+
+.cd-pop {
+  animation: cd-pop var(--cd-duration) var(--cd-ease-spring) both;
+}
+
+/*
+ * Entree en cascade d'une liste.
+ *
+ * Le decalage est PLAFONNE au huitieme element : au-dela, le dernier
+ * apparaitrait une seconde apres le premier, et l'utilisateur attendrait la
+ * fin de l'animation au lieu de lire.
+ */
+.cd-stagger > * {
+  animation: cd-rise var(--cd-duration) var(--cd-ease-out) both;
+}
+.cd-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.cd-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.cd-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.cd-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.cd-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.cd-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.cd-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.cd-stagger > *:nth-child(n + 8) { animation-delay: 280ms; }
+
+/* Surface de verre posee sur une image. */
+.cd-glass {
+  background: var(--cd-glass);
+  backdrop-filter: blur(var(--cd-glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--cd-glass-blur)) saturate(140%);
+  border: 1px solid var(--cd-glass-border);
+}
+
+.cd-glass-strong {
+  background: var(--cd-glass-strong);
+  backdrop-filter: blur(var(--cd-glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--cd-glass-blur)) saturate(140%);
+  border: 1px solid var(--cd-glass-border);
+}
+
+/* Verre sombre, pour du texte clair sur une photo lumineuse. */
+.cd-glass-dark {
+  background: var(--cd-glass-dark);
+  backdrop-filter: blur(var(--cd-glass-blur)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--cd-glass-blur)) saturate(120%);
+  border: 1px solid var(--cd-glass-dark-border);
+}
+
+/* Reaction au survol : discrete, et jamais sur un ecran tactile. */
+@media (hover: hover) {
+  .cd-lift {
+    transition:
+      transform var(--cd-duration-fast) var(--cd-ease-out),
+      box-shadow var(--cd-duration-fast) var(--cd-ease-out),
+      border-color var(--cd-duration-fast) var(--cd-ease-out);
+  }
+
+  .cd-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--cd-shadow-lg);
+  }
+}
+
+/*
+ * Respect de la preference systeme.
+ *
+ * On neutralise sans SUPPRIMER : les elements animes doivent rester
+ * visibles. Une animation `both` laissee a son etat initial masquerait la
+ * moitie de la page.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .cd-lift:hover {
+    transform: none;
   }
 }

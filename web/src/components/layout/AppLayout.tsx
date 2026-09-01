@@ -10,6 +10,16 @@ import { Sidebar } from './Sidebar'
  * Le titre affiché dans l'en-tête est dérivé de la route via `findNavItem` :
  * chaque page n'a donc pas à le redéclarer, et le menu reste l'unique source
  * de vérité de la navigation.
+ *
+ * **Transition de page.** Le `key` posé sur `<main>` force React à remonter
+ * le contenu à chaque changement de chemin, ce qui relance l'animation
+ * d'entrée. Sans lui, React réutiliserait le nœud et la page suivante
+ * apparaîtrait sans transition — le déplacement serait invisible, et l'on ne
+ * saurait pas si le clic a été pris en compte.
+ *
+ * La durée est courte et la translation faible : une transition qu'on
+ * remarque est une transition trop longue. Elle est neutralisée sous
+ * `prefers-reduced-motion` par la règle globale de `tokens.css`.
  */
 export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -49,7 +59,7 @@ export function AppLayout() {
           onOpenMenu={() => setMenuOpen(true)}
         />
 
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <main key={location.pathname} className="cd-rise mx-auto max-w-6xl px-4 py-6 sm:px-6">
           <Outlet />
         </main>
       </div>

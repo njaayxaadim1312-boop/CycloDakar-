@@ -17,7 +17,7 @@ export function LoginPage() {
 
   // Après une connexion réussie, on revient à la page que l'utilisateur
   // voulait atteindre avant d'être renvoyé ici.
-  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+  const from = (location.state as { from?: string } | null)?.from ?? '/'
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()

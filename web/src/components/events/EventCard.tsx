@@ -1,19 +1,8 @@
-import { Bike, Footprints, MapPin, Mountain, Route, Users } from 'lucide-react'
+import { MapPin, Route, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatDateTime, formatDistance } from '@/lib/format'
-import type { ClubEvent, SportCode } from '@/types/api'
-
-const SPORT_ICON: Record<SportCode, typeof Bike> = {
-  CYCLING: Bike,
-  RUNNING: Footprints,
-  HIKING: Mountain,
-}
-
-const SPORT_COLOR: Record<SportCode, string> = {
-  CYCLING: 'var(--cd-sport-cycling)',
-  RUNNING: 'var(--cd-sport-running)',
-  HIKING: 'var(--cd-sport-hiking)',
-}
+import { SPORT_COLOR, SPORT_ICON, sportTint } from '@/lib/sports'
+import type { ClubEvent } from '@/types/api'
 
 interface EventCardProps {
   event: ClubEvent
@@ -41,7 +30,7 @@ export function EventCard({ event }: EventCardProps) {
       <div className="flex items-start gap-3">
         <span
           className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: `color-mix(in srgb, ${SPORT_COLOR[event.sport]} 16%, transparent)` }}
+          style={{ background: sportTint(event.sport, 16) }}
         >
           <Icon size={20} style={{ color: SPORT_COLOR[event.sport] }} aria-hidden="true" />
         </span>

@@ -36,7 +36,7 @@ export function RegisterPage() {
         password: form.password,
         password_confirmation: form.password_confirmation,
       })
-      navigate('/dashboard', { replace: true })
+      navigate('/', { replace: true })
     } catch (caught) {
       setError(caught instanceof ApiError ? caught : null)
     } finally {

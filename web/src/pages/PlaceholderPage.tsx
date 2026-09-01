@@ -32,7 +32,7 @@ export function PlaceholderPage() {
         </p>
       )}
 
-      <Link to="/dashboard" className="cd-btn cd-btn-primary mt-6">
+      <Link to="/" className="cd-btn cd-btn-primary mt-6">
         <ArrowLeft size={16} />
         Retour au tableau de bord
       </Link>

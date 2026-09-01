@@ -9,7 +9,7 @@
 /** Montant en francs CFA. Toujours un ENTIER — le XOF n'a pas de centimes. */
 export type Fcfa = number
 
-export type SportCode = 'CYCLING' | 'RUNNING' | 'HIKING'
+export type SportCode = 'CYCLING' | 'RUNNING' | 'HIKING' | 'WALKING'
 
 export type RoleCode =
   | 'MEMBER'
@@ -513,16 +513,58 @@ export interface WeeklyTrendPoint {
   activities: number
 }
 
+/** Objectifs hebdomadaires. Unités SI : mètres et secondes. */
+export interface WeeklyGoals {
+  distance_m: number
+  moving_time_s: number
+  activities: number
+}
+
+/**
+ * Un anneau.
+ *
+ * `percent` vaut `null` quand l'objectif est à zéro — désactivé, et non
+ * atteint à 100 %. Il peut dépasser 100 : le serveur n'écrête pas, une
+ * semaine à 150 % mérite de se voir.
+ */
+export interface RingMetric {
+  value: number
+  goal: number
+  percent: number | null
+  completed: boolean
+}
+
+export interface WeekDay {
+  date: string
+  label: string
+  distance_m: number
+  active: boolean
+}
+
+/** Anneaux de la semaine en cours, quelle que soit la période affichée. */
+export interface WeekRings {
+  week_start: string
+  metrics: {
+    distance_m: RingMetric
+    moving_time_s: RingMetric
+    activities: RingMetric
+  }
+  days: WeekDay[]
+}
+
 export interface PersonalStats {
   period: StatsPeriod
   period_label: string
   /** `null` pour la période « depuis toujours ». */
   period_from: string | null
   totals: PersonalTotals
+  goals: WeeklyGoals
   by_sport: Record<string, SportBreakdown>
   /** Records sur TOUTE la carrière, jamais sur la période affichée. */
   records: PersonalRecords
   trend: WeeklyTrendPoint[]
+  /** Toujours la semaine en cours, même quand `period` vaut `year`. */
+  rings: WeekRings
 }
 
 /* -------------------------------------------------------------------------- */

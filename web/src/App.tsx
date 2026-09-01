@@ -2,8 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RedirectIfAuthenticated, RequireAuth } from '@/components/RequireAuth'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { allNavItems } from '@/config/navigation'
+import { ActivityHomePage } from '@/pages/ActivityHomePage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { ManagementPage } from '@/pages/ManagementPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
@@ -28,19 +30,26 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  * sa route. Les écrans réellement implémentés sont déclarés avant, et
  * prennent le pas sur l'écran d'attente.
  *
+ * La RACINE est l'écran d'activité : anneaux de la semaine, dernières
+ * sorties, prochaine sortie du club. Le tableau de bord du club, lui, vit sous
+ * `/gestion/tableau-de-bord` — il est utile au bureau, mais ce n'est pas ce
+ * qu'un membre vient chercher en ouvrant l'application.
+ *
  * Écrans livrés à ce jour :
- *   PHASE 1  /dashboard, /system
+ *   PHASE 1  / (activite), /system
  *   PHASE 2  /login, /register, /forgot-password, /reset-password
  *   PHASE 3  /members, /members/nouveau, /members/:uuid, /members/:uuid/modifier
  *   PHASE 4  /profile
  *   PHASE 7  /activities, /activities/:uuid
  *   PHASE 8  /stats
  *   PHASE 9  /events, /events/nouveau, /events/:uuid, /events/:uuid/modifier
+ *   PHASE 9bis  / (activite), /gestion, /gestion/tableau-de-bord
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
 const IMPLEMENTED = new Set([
-  '/dashboard',
+  '/',
+  '/gestion',
   '/system',
   '/members',
   '/profile',
@@ -69,8 +78,21 @@ export default function App() {
       {/* --- Application, réservée aux comptes connectés ----------------- */}
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          {/* L'exercice d'abord : la racine est l'écran d'activité. */}
+          <Route path="/" element={<ActivityHomePage />} />
+
+          {/* Tout ce qui touche à l'argent et à l'administration passe par
+              une seule porte. */}
+          <Route path="/gestion" element={<ManagementPage />} />
+          <Route path="/gestion/tableau-de-bord" element={<DashboardPage />} />
+
+          {/* Ancien chemin du tableau de bord : les liens déjà partagés et
+              les favoris du bureau doivent continuer de fonctionner. */}
+          <Route
+            path="/dashboard"
+            element={<Navigate to="/gestion/tableau-de-bord" replace />}
+          />
+
           <Route path="/system" element={<SystemStatusPage />} />
           <Route path="/profile" element={<ProfilePage />} />
 
@@ -101,7 +123,7 @@ export default function App() {
               <Route key={item.to} path={item.to} element={<PlaceholderPage />} />
             ))}
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Route>
     </Routes>

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { AlertCircle, Bike, Footprints, Mountain, Route } from 'lucide-react'
+import { AlertCircle, Route } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -7,26 +7,8 @@ import { Pagination } from '@/components/ui/Pagination'
 import { ApiError } from '@/lib/api'
 import { fetchActivities, type ActivityFilters } from '@/lib/activities'
 import { formatDate, formatDistance, formatDurationLong, formatSpeed } from '@/lib/format'
+import { SPORT_COLOR, SPORT_FILTERS, SPORT_ICON } from '@/lib/sports'
 import type { Activity, SportCode } from '@/types/api'
-
-const SPORT_ICON: Record<SportCode, typeof Bike> = {
-  CYCLING: Bike,
-  RUNNING: Footprints,
-  HIKING: Mountain,
-}
-
-const SPORT_COLOR: Record<SportCode, string> = {
-  CYCLING: 'var(--cd-sport-cycling)',
-  RUNNING: 'var(--cd-sport-running)',
-  HIKING: 'var(--cd-sport-hiking)',
-}
-
-const FILTERS: { value: SportCode | ''; label: string }[] = [
-  { value: '', label: 'Tous les sports' },
-  { value: 'CYCLING', label: 'Cyclisme' },
-  { value: 'RUNNING', label: 'Course' },
-  { value: 'HIKING', label: 'Randonnée' },
-]
 
 /**
  * Historique des sorties du club.
@@ -76,7 +58,7 @@ export function ActivitiesPage() {
           aria-label="Filtrer par sport"
           className="rounded-[var(--cd-radius-sm)] border border-[var(--cd-border-strong)] bg-[var(--cd-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--cd-orange)]"
         >
-          {FILTERS.map((option) => (
+          {SPORT_FILTERS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -159,7 +141,9 @@ export function ActivitiesPage() {
 /* -------------------------------------------------------------------------- */
 
 function ActivityRow({ activity }: { activity: Activity }) {
-  const Icon = SPORT_ICON[activity.sport] ?? Bike
+  // La table couvre TOUS les sports (Record<SportCode, …>) : plus de
+  // repli, qui masquait un sport oublié derrière une icône de vélo.
+  const Icon = SPORT_ICON[activity.sport]
 
   return (
     <Link
