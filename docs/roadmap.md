@@ -460,11 +460,31 @@ export PDF, Excel et CSV, génération asynchrone pour les gros volumes.
 
 ---
 
-## ⏳ Phase 15 — Vidéo animée du parcours
+## ✅ Phase 15 — Vidéo animée du parcours *(livrée côté navigateur)*
 
-Rendu FFmpeg côté Node, carte animée, trace progressive, marqueur mobile, overlay
-distance/vitesse/durée, écran final aux couleurs du club, formats 16:9, 9:16 et 1:1,
-durées 15/30/60 s, file d'attente et notification.
+Avancée hors ordre, à la demande du club.
+
+**Backend** — `GET /activities/{uuid}/replay` : trace **horodatée**, décimée à
+600 points. Chaque point porte sa seconde depuis le départ, sa distance cumulée
+et la vitesse de son segment. Sans le temps, une animation effacerait les pauses
+et ferait monter une côte aussi vite qu'une descente.
+
+**Web** — `/activities/{uuid}/video` : le parcours se dessine du départ à
+l'arrivée sur un fond OpenStreetMap, le marqueur avance à la vitesse réelle,
+les statistiques défilent avec lui. Écran d'ouverture et écran final aux
+couleurs du club. Formats 9:16, 1:1, 16:9 ; durées 15, 30, 60 s.
+
+**La vidéo se fabrique dans le navigateur** (`canvas.captureStream` +
+`MediaRecorder`) : pas de FFmpeg à installer, pas de file d'attente. Le fichier
+part dans les téléchargements, prêt pour WhatsApp.
+
+**Vérifié** — backend : 301 tests / 904 assertions (7 nouveaux, dont la pause
+qui doit se voir dans les temps). Web : `tsc -b`, build, rendu headless, et 13
+assertions sur l'interpolation et le cadrage.
+
+**Reste à faire** — le rendu serveur FFmpeg (§4 de video.md) : pour les
+navigateurs qui ne savent pas encoder, et pour fermer l'onglet pendant la
+fabrication.
 
 Voir [video.md](video.md).
 

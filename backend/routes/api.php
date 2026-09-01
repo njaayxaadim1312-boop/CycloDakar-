@@ -159,6 +159,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/', [ActivityController::class, 'store'])->name('store');
 
             Route::get('/{activity}', [ActivityController::class, 'show'])->name('show');
+
+            // Trace horodatee pour le rejeu anime — PHASE 15.
+            Route::get('/{activity}/replay', [ActivityController::class, 'replay'])
+                ->name('replay');
             Route::patch('/{activity}', [ActivityController::class, 'update'])->name('update');
             Route::delete('/{activity}', [ActivityController::class, 'destroy'])->name('destroy');
 

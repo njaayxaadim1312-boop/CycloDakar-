@@ -14,6 +14,7 @@ import { RecordPage } from '@/pages/record/RecordPage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
 import { ActivitiesPage } from '@/pages/activities/ActivitiesPage'
 import { ActivityDetailPage } from '@/pages/activities/ActivityDetailPage'
+import { ActivityMoviePage } from '@/pages/activities/ActivityMoviePage'
 import { EventDetailPage } from '@/pages/events/EventDetailPage'
 import { EventFormPage } from '@/pages/events/EventFormPage'
 import { EventsPage } from '@/pages/events/EventsPage'
@@ -113,6 +114,8 @@ export default function App() {
           {/* Activités — phase 7 */}
           <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/activities/:uuid" element={<ActivityDetailPage />} />
+          {/* Le parcours rejoue en video — phase 15. */}
+          <Route path="/activities/:uuid/video" element={<ActivityMoviePage />} />
 
           {/* Enregistrement d'une sortie depuis le navigateur. */}
           <Route path="/record" element={<RecordPage />} />

@@ -12,6 +12,7 @@ use App\Http\Requests\Activity\StoreActivityRequest;
 use App\Http\Requests\Activity\StorePointsRequest;
 use App\Http\Resources\ActivityResource;
 use App\Models\Activity;
+use App\Services\Gps\ReplayBuilder;
 use App\Services\ActivitySyncService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -159,6 +160,24 @@ final class ActivityController extends Controller
      *
      * `GET /activities?sport=CYCLING&from=2026-09-01&to=2026-09-30&mine=1`
      */
+    /**
+     * Trace horodatee, pour le rejeu anime.
+     *
+     * La polyligne stockee suffit a DESSINER un parcours, pas a le REJOUER :
+     * elle ne porte aucun temps. Une animation a vitesse constante effacerait
+     * les pauses et ferait monter une cote aussi vite qu'une descente — or
+     * c'est exactement ce qu'un membre veut revoir.
+     *
+     * Meme droit de lecture que la fiche : une trace GPS revele le domicile
+     * et les habitudes, et le rejeu n'en est qu'une autre presentation.
+     */
+    public function replay(Request $request, Activity $activity, ReplayBuilder $builder): JsonResponse
+    {
+        $this->authorize('view', $activity);
+
+        return ApiResponse::ok($builder->build($activity));
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Activity::class);

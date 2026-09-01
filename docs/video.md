@@ -1,8 +1,8 @@
 # Vidéo animée du parcours
 
-> **Reportée à la phase 15.** L'infrastructure (file d'attente, signature HMAC,
-> WebSocket de progression, webhook de retour) est en place depuis la phase 1 ;
-> le moteur de rendu ne l'est pas encore et renvoie volontairement `501`.
+> **Livrée — dans le navigateur.** Le parcours se rejoue et s'exporte en
+> fichier vidéo depuis `/activities/{uuid}/video`, sans serveur de rendu.
+> Le rendu serveur décrit au §4 reste à venir : voir §7.
 
 ## 1. Intention
 
@@ -101,3 +101,53 @@ Ou renseigner `FFMPEG_PATH` dans `services/.env`.
 
 Musique de fond, thèmes graphiques (`classic`, `night`, `sunset`), vidéo collective
 d'un événement (plusieurs traces animées ensemble), incrustation du classement du jour.
+
+## 6. Ce qui est livré
+
+### 6.1 Le rejeu, côté serveur
+
+`GET /activities/{uuid}/replay` renvoie la trace **horodatée** : chaque point
+porte sa seconde depuis le départ, sa distance cumulée et la vitesse de son
+segment.
+
+C'est le point essentiel du module. La polyligne stockée suffit à *dessiner* un
+parcours, pas à le *rejouer* : elle ne porte aucun temps. Une animation qui la
+parcourrait à vitesse constante **effacerait les pauses** et ferait monter une
+côte aussi vite qu'une descente — or c'est exactement ce qu'un membre veut
+revoir.
+
+La trace est décimée à 600 points au plus, avec un pas **régulier** et non une
+simplification de Douglas-Peucker comme pour la polyligne stockée : celle-ci
+supprime les points alignés, or ce sont eux qui portent le temps. Une longue
+ligne droite parcourue lentement doit rester lente à l'écran.
+
+### 6.2 La vidéo, fabriquée dans le navigateur
+
+Le film est dessiné sur un `<canvas>` et non avec Leaflet, pour une raison
+décisive : `captureStream()` n'existe que sur un canevas. C'est lui qui permet
+d'obtenir un vrai fichier vidéo depuis le téléphone, sans FFmpeg ni file
+d'attente.
+
+| Point | Décision |
+|---|---|
+| Tuiles OSM | chargées en `crossOrigin="anonymous"` — sans quoi le canevas est « souillé » et l'export échoue |
+| Tuiles manquantes | on dessine ce qu'on a et on redessine à leur arrivée ; attendre le réseau rendrait l'animation saccadée |
+| Garde-fou | au-delà de 400 tuiles, on n'en demande aucune : un cadrage aberrant ferait bannir l'application d'OSM |
+| Format | MP4 (`avc1`) d'abord, WebM en repli — seul MP4 se lit partout sur WhatsApp et iOS |
+| Enregistrement | en **temps réel** : `captureStream` filme ce que le canevas affiche |
+
+Formats 9:16, 1:1 et 16:9 ; durées 15, 30 et 60 s. Le facteur d'accélération
+est affiché : « sortie de 30 min condensée en 30 s, soit ×60 ».
+
+## 7. Ce qui reste — rendu serveur
+
+Le pipeline du §4 garde deux justifications que le navigateur ne couvre pas :
+
+1. **Les navigateurs qui ne savent pas encoder.** L'écran le dit et propose
+   l'enregistrement d'écran, mais un rendu serveur ferait mieux.
+2. **Fermer l'onglet.** L'enregistrement se fait en temps réel, page au
+   premier plan. Une file d'attente permettrait de demander la vidéo et de la
+   récupérer plus tard.
+
+L'infrastructure (file, HMAC, WebSocket, webhook) est en place depuis la
+phase 1 et n'a pas bougé.

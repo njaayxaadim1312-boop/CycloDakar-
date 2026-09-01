@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle,
   ArrowLeft,
+  Clapperboard,
   Clock,
   Gauge,
   MapPin,
@@ -171,7 +172,21 @@ export function ActivityDetailPage() {
 
       {/* --- Carte -------------------------------------------------------- */}
       <section className="cd-card overflow-hidden p-5">
-        <h3 className="mb-3 text-lg">Parcours</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg">Parcours</h3>
+
+          {/* Le film du parcours : depart, itineraire, arrivee, en video
+              partageable. C'est ce que les membres montrent apres une
+              sortie. */}
+          <Link
+            to={`/activities/${activity.uuid}/video`}
+            className="inline-flex items-center gap-2 rounded-[var(--cd-radius-pill)] bg-[var(--cd-black)] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <Clapperboard size={16} aria-hidden="true" />
+            Revoir en vidéo
+          </Link>
+        </div>
+
         <ActivityMap polyline={activity.polyline} bounds={activity.bounds} height={380} />
       </section>
 
