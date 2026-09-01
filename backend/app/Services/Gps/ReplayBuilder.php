@@ -37,7 +37,7 @@ final class ReplayBuilder
         $rows = DB::table('activity_points')
             ->where('activity_id', $activity->id)
             ->orderBy('seq')
-            ->get(['lat', 'lng', 'altitude_m', 'recorded_at']);
+            ->get(['lat', 'lng', 'altitude_m', 'accuracy_m', 'recorded_at']);
 
         if ($rows->count() < 2) {
             return [
@@ -47,53 +47,61 @@ final class ReplayBuilder
             ];
         }
 
-        $points = $this->decimate($rows->all(), self::MAX_POINTS);
+        /*
+         | La distance se calcule sur TOUS les points, avec les memes regles
+         | que le reste de l'application, PUIS la trace est decimee.
+         |
+         | L'inverse — decimer d'abord, additionner ensuite — donnait un
+         | chiffre different de celui de la sortie : 38 m dans la video contre
+         | 26 m sur la fiche, pour la meme sortie. Deux chiffres pour une meme
+         | chose detruisent la confiance plus surement qu'un chiffre
+         | approximatif.
+         */
+        $cumulative = $this->cumulativeDistance($rows->all(), $activity);
 
-        $first = strtotime((string) $points[0]->recorded_at);
+        $indices = $this->keptIndices($rows->count(), self::MAX_POINTS);
+
+        $first = strtotime((string) $rows[0]->recorded_at);
         $built = [];
-        $distance = 0.0;
         $previous = null;
 
-        foreach ($points as $point) {
-            $lat = (float) $point->lat;
-            $lng = (float) $point->lng;
-            $at = strtotime((string) $point->recorded_at) - $first;
+        foreach ($indices as $index) {
+            $row = $rows[$index];
 
+            $at = strtotime((string) $row->recorded_at) - $first;
+            $distance = $cumulative[$index];
+
+            // La vitesse est celle du SEGMENT affiche, pas du point : c'est
+            // entre deux points affiches que le client interpole.
             $speed = 0.0;
 
             if ($previous !== null) {
-                $segment = $this->haversine($previous['lat'], $previous['lng'], $lat, $lng);
-                $distance += $segment;
-
                 $elapsed = $at - $previous['t'];
-                // La décimation crée de longs segments : la vitesse est celle
-                // du SEGMENT, pas du point. C'est ce qu'il faut pour une
-                // animation, où l'on interpole justement entre deux points.
-                $speed = $elapsed > 0 ? $segment / $elapsed : 0.0;
+                $speed = $elapsed > 0 ? ($distance - $previous['d']) / $elapsed : 0.0;
             }
 
             $built[] = [
-                'lat' => round($lat, 6),
-                'lng' => round($lng, 6),
-                // Secondes depuis le départ : le temps réel, pauses comprises.
+                'lat' => round((float) $row->lat, 6),
+                'lng' => round((float) $row->lng, 6),
+                // Secondes depuis le depart : le temps reel, pauses comprises.
                 't' => $at,
                 'd' => (int) round($distance),
                 'v' => round($speed, 2),
-                'a' => $point->altitude_m !== null ? (int) round((float) $point->altitude_m) : null,
+                'a' => $row->altitude_m !== null ? (int) round((float) $row->altitude_m) : null,
             ];
 
-            $previous = ['lat' => $lat, 'lng' => $lng, 't' => $at];
+            $previous = ['t' => $at, 'd' => $distance];
         }
 
         return [
             'available' => true,
             'points' => $built,
-            // Durée réelle de la sortie : c'est elle que l'accélération
-            // rapporte à la durée de la vidéo.
+            // Duree reelle de la sortie : c'est elle que l'acceleration
+            // rapporte a la duree de la video.
             'duration_s' => $built[count($built) - 1]['t'],
             'distance_m' => $built[count($built) - 1]['d'],
             'bounds' => $this->bounds($built),
-            // Les zones traversées jalonnent le récit : « Ouakam, puis la
+            // Les zones traversees jalonnent le recit : « Ouakam, puis la
             // Corniche, puis Popenguine ».
             'zones' => $activity->zones ?? [],
         ];
@@ -102,40 +110,120 @@ final class ReplayBuilder
     /* ---------------------------------------------------------------------- */
 
     /**
-     * Réduit la trace en gardant le premier et le dernier point.
+     * Distance cumulee a chaque point, filtree comme sur la fiche.
      *
-     * Un pas régulier suffit ici : la simplification de Douglas-Peucker, qui
-     * sert à la polyligne stockée, supprimerait des points en ligne droite —
-     * or ce sont eux qui portent le TEMPS. Une longue ligne droite parcourue
-     * lentement doit rester lente à l'écran.
+     * Reprend mot pour mot les regles d'`ActivityStatsCalculator` :
+     *
+     *  - une ANCRE, qui ne bouge que sur un deplacement reel ;
+     *  - un seuil de distance par sport, releve a deux fois la precision
+     *    annoncee par l'appareil ;
+     *  - un seuil de vitesse, qui demasque la derive d'un recepteur immobile.
+     *
+     * Sans cela, la video afficherait une distance qui grimpe alors que le
+     * membre est a l'arret, et se terminerait sur un chiffre different de
+     * celui de sa sortie.
      *
      * @param  list<object>  $rows
-     * @return list<object>
+     * @return list<float>
      */
-    private function decimate(array $rows, int $max): array
+    private function cumulativeDistance(array $rows, Activity $activity): array
     {
-        $count = count($rows);
+        $sport = $activity->sport->value;
 
+        $minSegment = (float) config(
+            "cyclo.sports.{$sport}.min_distance_m",
+            config('cyclo.gps.min_segment_m', 1.0),
+        );
+        $idleSpeed = (float) config('cyclo.gps.idle_speed_mps', 0.8);
+        $factor = (float) config('cyclo.gps.accuracy_factor', 2.0);
+
+        $cumulative = [0.0];
+        $distance = 0.0;
+
+        $anchor = $rows[0];
+        $anchorAt = strtotime((string) $anchor->recorded_at);
+
+        for ($i = 1, $n = count($rows); $i < $n; $i++) {
+            $current = $rows[$i];
+            $at = strtotime((string) $current->recorded_at);
+            $elapsed = $at - $anchorAt;
+
+            if ($elapsed > 0) {
+                $segment = $this->haversine(
+                    (float) $anchor->lat,
+                    (float) $anchor->lng,
+                    (float) $current->lat,
+                    (float) $current->lng,
+                );
+
+                $threshold = max(
+                    $minSegment,
+                    $this->uncertainty($anchor, $current) * $factor,
+                );
+
+                if ($segment >= $threshold) {
+                    $speed = $segment / $elapsed;
+
+                    if ($speed >= $idleSpeed) {
+                        // Deplacement reel : on compte, et l'ancre suit.
+                        $distance += $segment;
+                        $anchor = $current;
+                        $anchorAt = $at;
+                    } else {
+                        // Trop lent : derive ou arret. L'ancre avance sans
+                        // rien compter — voir ActivityStatsCalculator.
+                        $anchor = $current;
+                        $anchorAt = $at;
+                    }
+                }
+            }
+
+            $cumulative[] = $distance;
+        }
+
+        return $cumulative;
+    }
+
+    /** Incertitude combinee de deux points, en metres. */
+    private function uncertainty(object $a, object $b): float
+    {
+        $values = array_filter(
+            [$a->accuracy_m ?? null, $b->accuracy_m ?? null],
+            static fn ($value): bool => $value !== null && (float) $value > 0,
+        );
+
+        if ($values === []) {
+            return 0.0;
+        }
+
+        return array_sum(array_map('floatval', $values)) / count($values);
+    }
+
+    /**
+     * Indices des points conserves pour l'affichage.
+     *
+     * @return list<int>
+     */
+    private function keptIndices(int $count, int $max): array
+    {
         if ($count <= $max) {
-            return $rows;
+            return range(0, $count - 1);
         }
 
         $step = $count / $max;
-        $kept = [];
+        $indices = [];
 
         for ($i = 0; $i < $max; $i++) {
-            $kept[] = $rows[(int) floor($i * $step)];
+            $indices[] = (int) floor($i * $step);
         }
 
-        // Le dernier point est conservé quoi qu'il arrive : sinon la trace
-        // paraîtrait s'arrêter avant l'arrivée.
-        $last = $rows[$count - 1];
-
-        if (end($kept) !== $last) {
-            $kept[] = $last;
+        // Le dernier point est conserve quoi qu'il arrive : sinon la trace
+        // paraitrait s'arreter avant l'arrivee.
+        if (end($indices) !== $count - 1) {
+            $indices[] = $count - 1;
         }
 
-        return $kept;
+        return $indices;
     }
 
     /**
