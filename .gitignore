@@ -54,3 +54,6 @@ backend/public/icons.svg
 
 # Binaire cloudflared, telecharge a la demande par demarrer-demo.ps1.
 tools/
+
+# Adresse publique du tunnel en cours : elle change a chaque demarrage.
+ADRESSE-DEMO.txt
