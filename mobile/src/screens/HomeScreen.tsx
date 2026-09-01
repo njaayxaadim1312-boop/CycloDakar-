@@ -10,7 +10,9 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { fetchDashboardStats } from '../lib/stats'
+import { ApiError } from '../lib/api'
+import { formatDistance, formatDurationLong } from '../lib/format'
+import { fetchDashboardStats, fetchPersonalStats } from '../lib/stats'
 import { useCurrentUser } from '../stores/auth'
 import { fontSize, radius, spacing } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
@@ -18,6 +20,7 @@ import type { MemberStatusCode } from '../types/api'
 
 interface HomeScreenProps {
   onOpenMembers: () => void
+  onOpenHistory: () => void
 }
 
 /**
@@ -27,12 +30,11 @@ interface HomeScreenProps {
  * réels ; les modules à venir affichent leur phase, jamais un zéro qui
  * passerait pour une mesure.
  *
- * Le bouton « Démarrer une sortie » est le geste principal de l'application :
- * il est volontairement surdimensionné (72 dp), visé en roulant, parfois avec
- * des gants. Il arrive en phase 6 et reste ici désactivé plutôt qu'absent —
- * sa place est réservée, l'utilisateur sait où le chercher.
+ * Depuis la phase 8, l'écran ouvre sur MES chiffres : ce qu'un membre vient
+ * vérifier après une sortie, c'est son propre cumul, pas l'effectif du club.
+ * Les statistiques du club restent en dessous.
  */
-export function HomeScreen({ onOpenMembers }: HomeScreenProps) {
+export function HomeScreen({ onOpenMembers, onOpenHistory }: HomeScreenProps) {
   const { colors, isDark } = useTheme()
   const user = useCurrentUser()
 
@@ -41,7 +43,17 @@ export function HomeScreen({ onOpenMembers }: HomeScreenProps) {
     queryFn: fetchDashboardStats,
   })
 
+  // Cumuls du mois en cours : la période que le membre consulte le plus.
+  const mine = useQuery({
+    queryKey: ['stats', 'me', 'month'],
+    queryFn: () => fetchPersonalStats('month'),
+    // Un compte sans fiche membre reçoit un 404 assumé : inutile d'insister.
+    retry: (count, error) =>
+      !(error instanceof ApiError && error.code === 'NO_MEMBER_PROFILE') && count < 2,
+  })
+
   const members = stats.data?.members
+  const myTotals = mine.data?.totals
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]} edges={['top']}>
@@ -77,20 +89,44 @@ export function HomeScreen({ onOpenMembers }: HomeScreenProps) {
           <Text style={styles.heroMotto}>Ensemble, plus loin, plus forts !</Text>
         </View>
 
-        {/* --- Action principale ------------------------------------------- */}
-        <Pressable
-          disabled
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          style={[styles.startButton, { backgroundColor: colors.disabledBg }]}
+        {/* --- Mes chiffres du mois ---------------------------------------- */}
+        <View
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          <Text style={[styles.startLabel, { color: colors.disabledText }]}>
-            Démarrer une sortie
-          </Text>
-          <Text style={[styles.startHint, { color: colors.disabledText }]}>
-            Enregistrement GPS · phase 6
-          </Text>
-        </Pressable>
+          <View style={styles.cardHead}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Ce mois-ci</Text>
+            <Pressable onPress={onOpenHistory} hitSlop={8}>
+              <Text style={[styles.link, { color: colors.orangeText }]}>Mes sorties →</Text>
+            </Pressable>
+          </View>
+
+          {mine.isLoading && (
+            <Text style={[styles.muted, { color: colors.textMuted }]}>Chargement…</Text>
+          )}
+
+          {/* Un compte sans fiche membre n'a pas de statistiques : ce n'est
+              pas une panne, et le dire vaut mieux qu'un message d'erreur. */}
+          {mine.error instanceof ApiError && mine.error.code === 'NO_MEMBER_PROFILE' && (
+            <Text style={[styles.muted, { color: colors.textMuted }]}>
+              Votre compte n'est pas encore rattaché à une fiche membre.
+            </Text>
+          )}
+
+          {myTotals && (
+            <View style={styles.statRow}>
+              <Stat
+                value={formatDistance(myTotals.distance_m)}
+                label="parcourus"
+                primary
+              />
+              <Stat value={String(myTotals.activities)} label="sorties" />
+              <Stat
+                value={formatDurationLong(myTotals.moving_time_s)}
+                label="en mouvement"
+              />
+            </View>
+          )}
+        </View>
 
         {/* --- Effectif du club --------------------------------------------- */}
         <View
@@ -158,8 +194,6 @@ export function HomeScreen({ onOpenMembers }: HomeScreenProps) {
             Les modules arrivent phase par phase.
           </Text>
 
-          <Upcoming emoji="🚴" label="Enregistrement GPS des sorties" phase={6} />
-          <Upcoming emoji="🗺️" label="Carte et statistiques du parcours" phase={7} />
           <Upcoming emoji="📅" label="Événements du club" phase={9} />
           <Upcoming emoji="📷" label="Scanner un QR Code membre" phase={11} />
           <Upcoming emoji="💰" label="Mes participations" phase={12} />
@@ -187,7 +221,8 @@ function Stat({
   label,
   primary,
 }: {
-  value: number
+  /** Déjà formatée quand elle porte une unité (« 215 km »). */
+  value: number | string
   label: string
   primary?: boolean
 }) {
@@ -245,17 +280,6 @@ const styles = StyleSheet.create({
   },
   heroTitle: { fontSize: fontSize.h2, fontWeight: '800', color: '#1A1A1A' },
   heroMotto: { fontSize: fontSize.small, color: 'rgba(0,0,0,0.7)' },
-
-  // 72 dp : la cible du geste principal, visée en roulant.
-  startButton: {
-    minHeight: 72,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  startLabel: { fontSize: fontSize.h3, fontWeight: '800' },
-  startHint: { fontSize: fontSize.caption },
 
   card: {
     borderWidth: StyleSheet.hairlineWidth,

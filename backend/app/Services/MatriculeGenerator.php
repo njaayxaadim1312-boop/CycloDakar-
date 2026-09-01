@@ -44,8 +44,10 @@ final class MatriculeGenerator
         $separator = (string) config('cyclo.matricule.separator', '-');
         $padding = (int) config('cyclo.matricule.padding', 6);
 
+        $sequence = $this->nextSequence($prefix, $separator);
+
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
-            $candidate = $this->build($prefix, $separator, $padding, $this->nextSequence($prefix, $separator));
+            $candidate = $this->build($prefix, $separator, $padding, $sequence);
 
             // Les membres supprimés (soft delete) comptent : leur matricule
             // reste pris.
@@ -54,6 +56,12 @@ final class MatriculeGenerator
             if (! $taken) {
                 return $candidate;
             }
+
+            // On AVANCE. Réessayer le même numéro serait vain : rien n'a
+            // changé entre deux tours, et la boucle échouerait cinq fois pour
+            // rien. Le cas se produit dès qu'un matricule a été attribué à la
+            // main ou importé au-dessus du dernier créé.
+            $sequence++;
         }
 
         throw new RuntimeException(
@@ -70,9 +78,17 @@ final class MatriculeGenerator
 
         // `lockForUpdate` sérialise les inscriptions simultanées : la seconde
         // attend que la première ait écrit son membre avant de lire.
+        //
+        // Le tri porte sur le MATRICULE, pas sur l'identifiant : le dernier
+        // membre créé n'a pas forcément le plus grand numéro — un import ou
+        // une reprise de l'historique papier attribue des matricules dans un
+        // ordre quelconque. Trier par `id` renverrait alors un numéro déjà
+        // pris. La longueur passe avant la valeur pour rester juste au-delà
+        // du remplissage prévu ('CD-1000000' est supérieur à 'CD-999999',
+        // alors qu'il lui est lexicographiquement inférieur).
         $last = Member::withTrashed()
             ->where('matricule', 'like', $pattern)
-            ->orderByDesc('id')
+            ->orderByRaw('LENGTH(matricule) DESC, matricule DESC')
             ->lockForUpdate()
             ->value('matricule');
 

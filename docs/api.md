@@ -265,7 +265,8 @@ Statistiques du tableau de bord.
       "joined_this_month": 6,
       "growth": [{ "month": "2026-08", "label": "août 26", "count": 6 }]
     },
-    "activities":     { "available": false, "phase": 8 },
+    "activities":     { "available": true, "total": 214, "distance_m": 4812300,
+                        "moving_time_s": 618400, "this_month": 19 },
     "events":         { "available": false, "phase": 9 },
     "participations": { "available": false, "phase": 10 },
     "finance":        { "visible": true, "available": false, "phase": 13 },
@@ -295,6 +296,66 @@ fausse impression de croissance continue.
 
 Les fiches sont adressées par leur `uuid`, jamais par l'identifiant
 auto-incrémenté : sinon on pourrait énumérer les fiches et connaître l'effectif.
+
+
+### `GET /stats/me` — authentifié · phase 8
+
+Cumuls, régularité et records personnels du membre connecté.
+
+| Paramètre | Valeurs | Défaut |
+|---|---|---|
+| `period` | `week` · `month` · `year` · `all` | `month` |
+
+```json
+{
+  "data": {
+    "period": "month",
+    "period_label": "Ce mois-ci",
+    "period_from": "2026-08-01",
+    "totals": {
+      "activities": 7, "distance_m": 214500, "moving_time_s": 28900,
+      "duration_s": 31200, "elevation_gain_m": 340, "avg_speed_mps": 7.422
+    },
+    "by_sport": {
+      "CYCLING": { "label": "Cyclisme", "activities": 5,
+                   "distance_m": 190000, "moving_time_s": 24000 },
+      "RUNNING": { "…": {} }, "HIKING": { "…": {} }
+    },
+    "records": {
+      "longest_distance": {
+        "value": 118400, "activity_uuid": "…", "activity_title": "Dakar — Popenguine",
+        "sport": "CYCLING", "achieved_at": "2026-04-12T06:30:00+00:00"
+      },
+      "longest_duration": { "…": {} },
+      "max_speed": { "…": {} },
+      "most_elevation": null,
+      "best_pace": { "…": {} }
+    },
+    "trend": [{ "week": "2026-06-08", "label": "8 juin",
+                "distance_m": 0, "activities": 0 }]
+  }
+}
+```
+
+Quatre points de contrat, chacun destiné à empêcher un affichage trompeur :
+
+- **Les cumuls suivent la période, les records non.** Les records portent sur toute
+  la carrière du membre : un record du mois n'est pas un record.
+- **Un record absent vaut `null`, jamais zéro.** Dakar est plate et beaucoup de
+  sorties finissent à 0 m de dénivelé ; « record : 0 m » se lirait comme une
+  performance mesurée. Le client affiche un tiret.
+- **Tous les sports sont présents, même à zéro.** Un sport absent de la réponse
+  disparaîtrait de l'affichage et semblerait ne pas exister dans le club.
+- **Les douze semaines de `trend` sont toujours renvoyées**, les semaines creuses
+  à zéro : une courbe qui les sauterait donnerait une fausse impression de
+  régularité.
+
+`avg_speed_mps` est calculée sur les totaux (distance cumulée ÷ temps cumulé), et
+non en moyennant les moyennes : une sortie de 2 km ne doit pas peser autant qu'une
+de 40 km.
+
+Un compte sans fiche membre reçoit `404 NO_MEMBER_PROFILE` plutôt que des cumuls à
+zéro — l'absence de fiche et l'absence de sorties n'ont pas la même réponse.
 
 ### `GET /members` — annuaire paginé
 

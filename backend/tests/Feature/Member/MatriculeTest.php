@@ -80,12 +80,50 @@ final class MatriculeTest extends TestCase
     #[Test]
     public function le_generateur_tient_compte_des_membres_archives(): void
     {
-        Member::factory()->count(3)->create();
+        // Matricules explicites : la fabrique tient un compteur statique
+        // partagé par tous les tests du processus, et s'y fier rendrait ce
+        // test dépendant de l'ordre d'exécution de la suite.
+        Member::factory()->create(['matricule' => 'CD-000001']);
+        Member::factory()->create(['matricule' => 'CD-000002']);
+        Member::factory()->create(['matricule' => 'CD-000003']);
+
         Member::factory()->create(['matricule' => 'CD-000042'])->delete();
 
         $next = app(MatriculeGenerator::class)->nextInOwnTransaction();
 
         $this->assertSame('CD-000043', $next);
+    }
+
+    #[Test]
+    public function le_prochain_numero_suit_le_plus_grand_matricule_pas_le_dernier_cree(): void
+    {
+        // Cas réel : la reprise de l'historique papier du club. On saisit
+        // d'abord les anciens membres avec leur matricule d'origine, puis un
+        // membre plus ancien retrouvé après coup. Le dernier créé porte alors
+        // le PLUS PETIT numéro. Un tri par identifiant renverrait CD-000003 —
+        // déjà pris — et l'inscription suivante échouerait.
+        Member::factory()->create(['matricule' => 'CD-000120']);
+        Member::factory()->create(['matricule' => 'CD-000002']);
+
+        $next = app(MatriculeGenerator::class)->nextInOwnTransaction();
+
+        $this->assertSame('CD-000121', $next);
+    }
+
+    #[Test]
+    public function une_collision_fait_avancer_le_numero_au_lieu_de_le_reessayer(): void
+    {
+        // Deux matricules consécutifs déjà pris au-dessus du dernier créé.
+        // Réessayer le même candidat cinq fois de suite ne l'aurait jamais
+        // libéré : la génération doit avancer.
+        Member::factory()->create(['matricule' => 'CD-000010']);
+        Member::factory()->create(['matricule' => 'CD-000011'])->delete();
+
+        // Le membre au plus grand matricule est archivé : son numéro reste
+        // pris, et le suivant doit être CD-000012.
+        $next = app(MatriculeGenerator::class)->nextInOwnTransaction();
+
+        $this->assertSame('CD-000012', $next);
     }
 
     #[Test]

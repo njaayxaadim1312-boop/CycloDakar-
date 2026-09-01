@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Bike, Play, Users, UserRound } from 'lucide-react-native'
 import { useEffect } from 'react'
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native'
+import { ActivityDetailScreen } from '../screens/ActivityDetailScreen'
+import { HistoryScreen } from '../screens/HistoryScreen'
 import { HomeScreen } from '../screens/HomeScreen'
 import { MemberDetailScreen } from '../screens/MemberDetailScreen'
 import { MembersScreen } from '../screens/MembersScreen'
@@ -32,6 +34,12 @@ import { useTheme } from '../theme/useTheme'
  * que l'utilisateur se trouve.
  */
 
+export type HomeStackParams = {
+  HomeFeed: undefined
+  History: undefined
+  ActivityDetail: { uuid: string }
+}
+
 export type MembersStackParams = {
   MembersList: undefined
   MemberDetail: { uuid: string }
@@ -48,11 +56,52 @@ export type AuthStackParams = {
 }
 
 const Tabs = createBottomTabNavigator()
+const HomeStack = createNativeStackNavigator<HomeStackParams>()
 const MembersStack = createNativeStackNavigator<MembersStackParams>()
 const ProfileStack = createNativeStackNavigator<ProfileStackParams>()
 const AuthStack = createNativeStackNavigator<AuthStackParams>()
 
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Pile de l'onglet Accueil.
+ *
+ * L'historique et le détail d'une sortie vivent ici plutôt que dans un
+ * cinquième onglet : la barre en compte déjà quatre, et un cinquième
+ * rétrécirait des cibles tactiles qu'on vise parfois avec des gants.
+ */
+function HomeNavigator() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="HomeFeed">
+        {({ navigation }) => (
+          <HomeScreen
+            onOpenMembers={() => navigation.getParent()?.navigate('Membres')}
+            onOpenHistory={() => navigation.navigate('History')}
+          />
+        )}
+      </HomeStack.Screen>
+
+      <HomeStack.Screen name="History">
+        {({ navigation }) => (
+          <HistoryScreen
+            onBack={() => navigation.goBack()}
+            onOpenActivity={(uuid) => navigation.navigate('ActivityDetail', { uuid })}
+          />
+        )}
+      </HomeStack.Screen>
+
+      <HomeStack.Screen name="ActivityDetail">
+        {({ navigation, route }) => (
+          <ActivityDetailScreen
+            uuid={route.params.uuid}
+            onBack={() => navigation.goBack()}
+          />
+        )}
+      </HomeStack.Screen>
+    </HomeStack.Navigator>
+  )
+}
 
 function MembersNavigator() {
   return (
@@ -129,14 +178,11 @@ function AppTabs() {
     >
       <Tabs.Screen
         name="Accueil"
+        component={HomeNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Bike color={color} size={size} />,
         }}
-      >
-        {({ navigation }) => (
-          <HomeScreen onOpenMembers={() => navigation.navigate('Membres')} />
-        )}
-      </Tabs.Screen>
+      />
 
       {/*
         Onglet central, volontairement mis en avant. `unmountOnBlur` est

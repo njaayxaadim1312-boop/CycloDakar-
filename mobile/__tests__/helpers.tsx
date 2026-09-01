@@ -4,7 +4,13 @@ import type { ReactElement } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { ThemeProvider } from '../src/theme/useTheme'
-import type { CurrentUser, Member, MemberSearchResult } from '../src/types/api'
+import type {
+  Activity,
+  CurrentUser,
+  Member,
+  MemberSearchResult,
+  PersonalStats,
+} from '../src/types/api'
 
 /**
  * Outils partagés des tests mobiles.
@@ -157,10 +163,113 @@ export const dashboardStats = (overrides: Record<string, unknown> = {}) => ({
     joined_this_month: 6,
     growth: [{ month: '2026-08', label: 'août 26', count: 6 }],
   },
-  activities: { available: false, phase: 8 },
+  activities: {
+    available: true,
+    total: 214,
+    distance_m: 4_812_300,
+    moving_time_s: 618_400,
+    this_month: 19,
+  },
   events: { available: false, phase: 9 },
   participations: { available: false, phase: 10 },
   finance: { visible: false },
   generated_at: '2026-08-31T16:00:00+00:00',
+  ...overrides,
+})
+
+/**
+ * Cumuls et records personnels.
+ *
+ * Le jeu par défaut contient volontairement un record ABSENT
+ * (`most_elevation`) : Dakar est plate, beaucoup de sorties finissent à 0 m,
+ * et l'affichage doit montrer un tiret plutôt que « 0 m ».
+ */
+export const personalStats = (overrides: Partial<PersonalStats> = {}): PersonalStats => ({
+  period: 'month',
+  period_label: 'Ce mois-ci',
+  period_from: '2026-08-01',
+  totals: {
+    activities: 7,
+    distance_m: 214_500,
+    moving_time_s: 28_900,
+    duration_s: 31_200,
+    elevation_gain_m: 340,
+    avg_speed_mps: 7.422,
+  },
+  by_sport: {
+    CYCLING: { label: 'Cyclisme', activities: 5, distance_m: 190_000, moving_time_s: 24_000 },
+    RUNNING: { label: 'Course', activities: 2, distance_m: 24_500, moving_time_s: 4_900 },
+    HIKING: { label: 'Randonnée', activities: 0, distance_m: 0, moving_time_s: 0 },
+  },
+  records: {
+    longest_distance: {
+      value: 118_400, activity_uuid: 'a-1', activity_title: 'Dakar — Popenguine',
+      sport: 'CYCLING', achieved_at: '2026-04-12T06:30:00+00:00',
+    },
+    longest_duration: {
+      value: 19_800, activity_uuid: 'a-1', activity_title: 'Dakar — Popenguine',
+      sport: 'CYCLING', achieved_at: '2026-04-12T06:30:00+00:00',
+    },
+    max_speed: {
+      value: 16.9, activity_uuid: 'a-2', activity_title: 'Corniche matin',
+      sport: 'CYCLING', achieved_at: '2026-06-02T05:50:00+00:00',
+    },
+    most_elevation: null,
+    best_pace: {
+      value: 282, activity_uuid: 'a-3', activity_title: '10 km Ouakam',
+      sport: 'RUNNING', achieved_at: '2026-07-19T06:10:00+00:00',
+    },
+  },
+  trend: Array.from({ length: 12 }, (_, i) => ({
+    week: `2026-06-${String(i + 1).padStart(2, '0')}`,
+    label: `s${i + 1}`,
+    distance_m: i % 3 === 0 ? 0 : (i + 1) * 8_000,
+    activities: i % 3 === 0 ? 0 : 2,
+  })),
+  ...overrides,
+})
+
+export const anActivity = (overrides: Partial<Activity> = {}): Activity => ({
+  uuid: 'a-1',
+  title: 'Dakar — Popenguine',
+  custom_title: null,
+  notes: null,
+  sport: 'CYCLING',
+  sport_label: 'Cyclisme',
+  uses_pace: false,
+  status: 'COMPLETED',
+  status_label: 'Terminée',
+  visibility: 'CLUB',
+  visibility_label: 'Club',
+  started_at: '2026-04-12T06:30:00+00:00',
+  ended_at: '2026-04-12T12:00:00+00:00',
+  distance_m: 118_400,
+  duration_s: 19_800,
+  moving_time_s: 19_800,
+  paused_time_s: 0,
+  avg_speed_mps: 5.98,
+  max_speed_mps: 16.9,
+  elevation_gain_m: 210,
+  elevation_loss_m: 205,
+  min_altitude_m: 2,
+  max_altitude_m: 74,
+  avg_pace_s_per_km: null,
+  best_pace_s_per_km: null,
+  calories_kcal: null,
+  polyline: null,
+  bounds: null,
+  start: null,
+  end: null,
+  zones: ['Ouakam', 'Popenguine'],
+  points_count: 1_820,
+  member: {
+    uuid: 'm-me',
+    full_name: 'Awa Ndiaye',
+    initials: 'AN',
+    photo_url: null,
+  },
+  synced_at: '2026-04-12T12:05:00+00:00',
+  created_at: '2026-04-12T12:05:00+00:00',
+  permissions: { update: true, delete: true },
   ...overrides,
 })

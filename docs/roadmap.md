@@ -246,10 +246,58 @@ Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 
 ---
 
-## ⏳ Phase 8 — Historique des activités
+## ✅ Phase 8 — Historique, cumuls et records *(terminée)*
 
-Liste filtrable (sport, semaine, mois, année, période libre), miniature du parcours,
-fiche détaillée, records personnels, cumuls.
+**Backend**
+
+- `GET /stats/me?period=week|month|year|all` : cumuls de la période, répartition
+  par sport, tendance sur douze semaines et records personnels.
+- Les cumuls suivent la période demandée ; les **records portent sur toute la
+  carrière** — un record du mois n'est pas un record.
+- Un record inexistant renvoie `null`, jamais zéro. Dakar est plate : beaucoup de
+  sorties finissent à 0 m de dénivelé, et « record : 0 m » se lirait comme une
+  performance mesurée.
+- Tous les sports figurent dans la réponse, même à zéro ; les douze semaines de la
+  tendance aussi, les creuses comprises.
+- Vitesse moyenne calculée sur les totaux, pas en moyennant les moyennes.
+- Le tableau de bord porte enfin de **vraies mesures d'activité** (`available: true`)
+  au lieu d'annoncer la phase 8.
+- Générateur de matricules corrigé : le prochain numéro suit le **plus grand
+  matricule**, pas le dernier membre créé, et une collision fait avancer le
+  compteur au lieu de réessayer cinq fois le même numéro. Défaut révélé par la
+  suite complète ; deux tests de non-régression le verrouillent.
+
+**Web**
+
+- Écran **Mes statistiques** (`/stats`) : filtre de période porté par l'URL,
+  cumuls, graphique de régularité sur douze semaines, répartition par sport et
+  records cliquables menant à la sortie qui les a établis.
+- Le menu distinguait mal « livré en phase N » de « à venir en phase N » :
+  `DELIVERED_THROUGH_PHASE` tranche, la pastille ne marque plus que l'à-venir.
+
+**Mobile**
+
+- Accueil recentré sur **mes chiffres du mois** — ce qu'un membre vient vérifier
+  après une sortie, ce n'est pas l'effectif du club.
+- Écran **Mes sorties** : filtre de période, cumuls en tête, liste des sorties.
+  Les cumuls viennent de `/stats/me`, jamais de l'addition de la page affichée.
+- Écran **détail d'une sortie** : trace décodée depuis la polyligne du serveur
+  (les points bruts d'une sortie ancienne ont été purgés du téléphone), chiffres,
+  qualité du signal GPS et notes.
+- Pile de navigation sous l'onglet Accueil plutôt qu'un cinquième onglet, qui
+  aurait rétréci des cibles tactiles visées parfois avec des gants.
+
+**Vérifié**
+
+- Backend : **205 tests / 630 assertions** sur MySQL.
+- Mobile : **44 tests** ; bundle Android exporté (4,7 Mo).
+- Web : `tsc -b` et build propres ; rendu headless vérifié sur `/stats`,
+  `/dashboard`, `/activities` et `/profile`.
+
+**Reporté**
+
+- Pagination infinie de l'historique mobile → phase 18.
+- Période libre (dates au choix) sur le web → avec les rapports, phase 14.
 
 ---
 
