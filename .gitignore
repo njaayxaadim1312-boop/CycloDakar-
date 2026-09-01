@@ -42,3 +42,15 @@ desktop.ini
 # deux regeneres a la demande. Ils n'ont rien a faire dans le depot.
 web/dist-rendertest/
 web/vite.rendertest.config.ts
+
+# Web construit et depose dans Laravel par `php artisan cyclo:build-web`.
+# C'est un artefact : il se reconstruit en une commande, et le versionner
+# ferait entrer 1,3 Mo de fichiers minifies a chaque changement d'un pixel.
+backend/public/app/
+backend/public/assets/
+backend/public/brand/
+backend/public/favicon.svg
+backend/public/icons.svg
+
+# Binaire cloudflared, telecharge a la demande par demarrer-demo.ps1.
+tools/
