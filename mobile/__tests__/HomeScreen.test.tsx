@@ -2,14 +2,25 @@ import { fireEvent, screen } from '@testing-library/react-native'
 import { ApiError, api } from '../src/lib/api'
 import { HomeScreen } from '../src/screens/HomeScreen'
 import { useAuth } from '../src/stores/auth'
-import { aUser, dashboardStats, mockApi, personalStats, renderScreen } from './helpers'
+import {
+  anActivity,
+  aUser,
+  dashboardStats,
+  mockApi,
+  personalStats,
+  renderScreen,
+} from './helpers'
 
 /**
- * Accueil mobile.
+ * Accueil mobile — **l'exercice, et rien d'autre**.
  *
- * Le point à protéger : **aucun chiffre inventé**. Les effectifs sont réels,
- * les modules à venir affichent leur phase. Un jour cet écran montrera un
- * solde de caisse — confondre « rien » et « pas encore mesuré » y serait grave.
+ * L'écran s'ouvrait autrefois sur les effectifs du club. Ce qui est protégé
+ * ici, c'est le renversement : le membre voit SES chiffres, et l'écran ne
+ * parle plus ni d'effectifs, ni de caisse. Un membre sort son téléphone pour
+ * enregistrer une sortie.
+ *
+ * La règle d'origine tient toujours : **aucun chiffre inventé**. Un compte
+ * sans fiche membre le lit en clair plutôt que de voir des zéros.
  */
 describe('HomeScreen', () => {
   beforeEach(() => {
@@ -21,113 +32,102 @@ describe('HomeScreen', () => {
     useAuth.setState({ user: null, ready: true })
   })
 
-  it("salue le membre par son prénom seul", async () => {
+  const props = () => ({
+    onOpenHistory: jest.fn(),
+    onOpenActivity: jest.fn(),
+    onOpenEvents: jest.fn(),
+  })
+
+  const routes = (overrides: Record<string, unknown> = {}) => ({
+    '/stats/me': { data: personalStats() },
+    '/stats/dashboard': { data: dashboardStats() },
+    '/activities': {
+      data: [anActivity()],
+      meta: { current_page: 1, last_page: 1, per_page: 3, total: 1, has_more: false },
+    },
+    ...overrides,
+  })
+
+  it('salue le membre par son prénom seul', async () => {
     // Plus chaleureux, et surtout plus court sur un écran de téléphone.
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      '/stats/me': { data: personalStats() },
-    })
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
 
-    expect(screen.getByText('Bonjour Awa')).toBeOnTheScreen()
+    expect(await screen.findByText('Bonjour Awa')).toBeOnTheScreen()
     expect(screen.queryByText('Bonjour Awa Ndiaye')).toBeNull()
   })
 
-  it('affiche les effectifs réels du club', async () => {
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      // Cumuls personnels volontairement décalés de ceux du club : sinon un
-      // « 7 » lu à l'écran pourrait venir de l'un comme de l'autre, et le
-      // test ne prouverait plus rien.
-      '/stats/me': {
-        data: personalStats({
-          totals: {
-            activities: 3,
-            distance_m: 214_500,
-            moving_time_s: 28_900,
-            duration_s: 31_200,
-            elevation_gain_m: 340,
-            avg_speed_mps: 7.422,
-          },
-        }),
-      },
-    })
+  it('ouvre sur MES chiffres de la semaine', async () => {
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
 
-    expect(await screen.findByText('membres actifs')).toBeOnTheScreen()
-    expect(screen.getByText('ce mois-ci')).toBeOnTheScreen()
-    expect(screen.getByText('sans compte')).toBeOnTheScreen()
-
-    // « 9 » apparait deux fois : le compteur d'actifs et la ligne « Actif »
-    // de la repartition. C'est voulu -- on verifie donc la presence, pas
-    // l'unicite.
-    expect(screen.getAllByText('9')).toHaveLength(2)
-    expect(screen.getByText('6')).toBeOnTheScreen() // adhesions du mois
-    expect(screen.getByText('7')).toBeOnTheScreen() // membres sans compte
+    expect(await screen.findByText('CETTE SEMAINE')).toBeOnTheScreen()
+    // 24 500 m parcourus sur un objectif de 20 000 m.
+    expect(screen.getByText('24,5 km')).toBeOnTheScreen()
+    expect(screen.getByText('/ 20,0 km')).toBeOnTheScreen()
   })
 
-  it("n'affiche que les statuts réellement présents", async () => {
-    // Une ligne « Suspendu : 0 » n'apprend rien et allonge la liste.
-    mockApi({
-      '/stats/dashboard': {
-        data: dashboardStats({
-          members: {
-            ...dashboardStats().members,
-            by_status: {
-              ACTIVE: { label: 'Actif', count: 9 },
-              PENDING: { label: 'En attente', count: 0 },
-              SUSPENDED: { label: 'Suspendu', count: 0 },
-              FORMER: { label: 'Ancien membre', count: 2 },
-            },
-          },
-        }),
-      },
-    })
+  it('ne parle plus des effectifs ni de la caisse', async () => {
+    // Le renversement est le point de cette version : ces mots ne doivent
+    // plus apparaître sur l'écran d'accueil.
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
+    await screen.findByText('CETTE SEMAINE')
 
-    expect(await screen.findByText('Actif')).toBeOnTheScreen()
-    expect(screen.getByText('Ancien membre')).toBeOnTheScreen()
-    expect(screen.queryByText('Suspendu')).toBeNull()
+    expect(screen.queryByText(/membres actifs/i)).toBeNull()
+    expect(screen.queryByText(/sans compte/i)).toBeNull()
+    expect(screen.queryByText(/caisse/i)).toBeNull()
+    expect(screen.queryByText(/solde/i)).toBeNull()
   })
 
-  it('annonce la phase des modules à venir plutôt qu’un zéro', async () => {
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      '/stats/me': { data: personalStats() },
-    })
+  it('montre la régularité de la semaine, jours creux compris', async () => {
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
 
-    expect(await screen.findByText('Événements du club')).toBeOnTheScreen()
-    expect(screen.getByText('P9')).toBeOnTheScreen()
-
-    // L'enregistrement GPS est livré depuis la phase 6 : le laisser dans
-    // « Prochainement » ferait passer une fonction disponible pour absente.
-    expect(screen.queryByText('Enregistrement GPS des sorties')).toBeNull()
+    expect(await screen.findByText('Régularité')).toBeOnTheScreen()
+    // Deux jours actifs sur sept dans le jeu d'essai.
+    expect(screen.getByText("2 jours d'activité sur les sept.")).toBeOnTheScreen()
   })
 
-  it('affiche mes cumuls du mois, pas ceux du club', async () => {
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      '/stats/me': { data: personalStats() },
-    })
+  it('liste mes dernières sorties', async () => {
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
 
-    // 214 500 m personnels, et non les 4 812 km du club.
-    expect(await screen.findByText('215 km')).toBeOnTheScreen()
-    expect(screen.getByText('parcourus')).toBeOnTheScreen()
-    expect(screen.getByText('8 h 01')).toBeOnTheScreen()
+    expect(await screen.findByText('Dakar — Popenguine')).toBeOnTheScreen()
+    expect(screen.getByText('118 km')).toBeOnTheScreen()
+  })
+
+  it('invite à enregistrer quand il n’y a encore rien', async () => {
+    mockApi(
+      routes({
+        '/activities': {
+          data: [],
+          meta: { current_page: 1, last_page: 1, per_page: 3, total: 0, has_more: false },
+        },
+      }),
+    )
+
+    await renderScreen(<HomeScreen {...props()} />)
+
+    expect(
+      await screen.findByText(/Touchez « Démarrer » pour votre première sortie/),
+    ).toBeOnTheScreen()
   })
 
   it("le dit franchement quand le compte n'a pas de fiche membre", async () => {
-    // Cas réel : un compte créé en console. Des cumuls à zéro laisseraient
-    // croire à une absence de sorties alors que le problème est ailleurs.
+    // Des cumuls à zéro laisseraient croire à une absence de sorties alors
+    // que le problème est ailleurs.
+    // Le reste de l'écran doit continuer de répondre normalement : seule
+    // la requête des cumuls échoue.
+    const rest = routes()
+
     jest.spyOn(api, 'get').mockImplementation((...args: unknown[]) => {
-      const url = String(args[0])
+      const url = String(args[0]).split('?')[0] as string
 
       if (url.includes('/stats/me')) {
         return Promise.reject(
@@ -135,10 +135,16 @@ describe('HomeScreen', () => {
         )
       }
 
-      return Promise.resolve({ data: { data: dashboardStats() } })
+      const path = Object.keys(rest)
+        .filter((candidate) => url.endsWith(candidate))
+        .sort((a, b) => b.length - a.length)[0]
+
+      return path === undefined
+        ? Promise.reject(new Error(`Route non simulée : ${url}`))
+        : Promise.resolve({ data: rest[path as keyof typeof rest] })
     })
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    await renderScreen(<HomeScreen {...props()} />)
 
     expect(
       await screen.findByText(/pas encore rattaché à une fiche membre/),
@@ -146,42 +152,35 @@ describe('HomeScreen', () => {
   })
 
   it('mène à mes sorties', async () => {
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      '/stats/me': { data: personalStats() },
-    })
+    mockApi(routes())
 
-    const onOpenHistory = jest.fn()
-    await renderScreen(
-      <HomeScreen onOpenMembers={jest.fn()} onOpenHistory={onOpenHistory} />,
-    )
+    const handlers = props()
+    await renderScreen(<HomeScreen {...handlers} />)
 
-    await fireEvent.press(await screen.findByText('Mes sorties →'))
+    await fireEvent.press(await screen.findByText('Tout voir →'))
 
-    expect(onOpenHistory).toHaveBeenCalled()
+    expect(handlers.onOpenHistory).toHaveBeenCalled()
   })
 
-  it("explique l'échec au lieu d'afficher des cases vides", async () => {
-    jest.spyOn(api, 'get').mockRejectedValue(new Error('offline'))
+  it('ouvre la sortie touchée', async () => {
+    mockApi(routes())
 
-    await renderScreen(<HomeScreen onOpenMembers={jest.fn()} onOpenHistory={jest.fn()} />)
+    const handlers = props()
+    await renderScreen(<HomeScreen {...handlers} />)
 
-    expect(
-      await screen.findByText(/Statistiques indisponibles/),
-    ).toBeOnTheScreen()
+    await fireEvent.press(await screen.findByText('Dakar — Popenguine'))
+
+    expect(handlers.onOpenActivity).toHaveBeenCalledWith('a-1')
   })
 
-  it("mène à l'annuaire", async () => {
-    mockApi({
-      '/stats/dashboard': { data: dashboardStats() },
-      '/stats/me': { data: personalStats() },
-    })
+  it('mène à la prochaine sortie du club', async () => {
+    mockApi(routes())
 
-    const onOpenMembers = jest.fn()
-    await renderScreen(<HomeScreen onOpenMembers={onOpenMembers} onOpenHistory={jest.fn()} />)
+    const handlers = props()
+    await renderScreen(<HomeScreen {...handlers} />)
 
-    await fireEvent.press(screen.getByText('Annuaire →'))
+    await fireEvent.press(await screen.findByText('Grand Tour Cyclo Dakar'))
 
-    expect(onOpenMembers).toHaveBeenCalled()
+    expect(handlers.onOpenEvents).toHaveBeenCalled()
   })
 })

@@ -13,19 +13,14 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { fetchEvents } from '../../lib/events'
+import { SPORT_EMOJI } from '../../lib/sports'
 import { formatDateTime, formatDistance } from '../../lib/format'
 import { fontSize, radius, spacing } from '../../theme/tokens'
 import { useTheme } from '../../theme/useTheme'
-import type { ClubEvent, SportCode } from '../../types/api'
+import type { ClubEvent } from '../../types/api'
 
 interface EventsScreenProps {
   onOpenEvent: (uuid: string) => void
-}
-
-const SPORT_EMOJI: Record<SportCode, string> = {
-  CYCLING: '🚴',
-  RUNNING: '🏃',
-  HIKING: '🥾',
 }
 
 const SCOPES: ReadonlyArray<{ value: 'upcoming' | 'past'; label: string }> = [

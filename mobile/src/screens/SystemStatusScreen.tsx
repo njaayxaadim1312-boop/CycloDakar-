@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { API_URL, getData } from '../lib/api'
 import { formatFcfa } from '../lib/format'
+import { SPORT_EMOJI } from '../lib/sports'
 import { fontSize, radius, spacing } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
 import type { AppConfig, Health, SportCode } from '../types/api'
@@ -27,12 +28,6 @@ import type { AppConfig, Health, SportCode } from '../types/api'
  *
  * Il sera remplacé par l'accueil à la phase 5.
  */
-
-const SPORT_EMOJI: Record<SportCode, string> = {
-  CYCLING: '🚴',
-  RUNNING: '🏃',
-  HIKING: '🥾',
-}
 
 interface SystemStatusScreenProps {
   /** Fourni quand l'ecran est ouvert depuis l'accueil (utilisateur connecte). */
@@ -182,7 +177,7 @@ export function SystemStatusScreen({ onBack }: SystemStatusScreenProps = {}) {
                 key={sport.code}
                 style={[styles.sportRow, { backgroundColor: colors.surface2 }]}
               >
-                <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport.code] ?? '🚴'}</Text>
+                <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport.code]}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.sportLabel, { color: colors.text }]}>{sport.label}</Text>
                   <Text style={[styles.sportMeta, { color: colors.textMuted }]}>

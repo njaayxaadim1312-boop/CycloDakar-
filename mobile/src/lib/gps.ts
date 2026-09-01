@@ -52,6 +52,21 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     minSegmentM: 1,
     elevationThresholdM: 10,
   },
+  /*
+   * La marche est le cas le plus exigeant du filtre : a 1,4 m/s, le bruit de
+   * position pese autant que le deplacement reel. `minSegmentM` monte donc a
+   * 2 m et `idleSpeedMps` descend a 0,4 — sans quoi la trace se remplirait de
+   * zigzags qui gonfleraient la distance, et la pause automatique se
+   * declencherait sur un marcheur qui avance.
+   */
+  WALKING: {
+    maxAccuracyM: 25,
+    maxSpeedMps: 3.5,
+    maxAccelerationMps2: 3,
+    idleSpeedMps: 0.4,
+    minSegmentM: 2,
+    elevationThresholdM: 10,
+  },
 }
 
 export interface Candidate {

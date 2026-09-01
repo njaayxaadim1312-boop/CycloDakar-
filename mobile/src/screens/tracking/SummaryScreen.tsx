@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Button } from '../../components/Button'
 import { TraceMap } from '../../components/TraceMap'
 import { getLocalActivity, type LocalActivity } from '../../lib/database'
+import { SPORT_EMOJI, SPORT_LABEL } from '../../lib/sports'
 import {
   formatDistance,
   formatDuration,
@@ -20,18 +21,6 @@ import type { SportCode } from '../../types/api'
 interface SummaryScreenProps {
   uuid: string
   onClose: () => void
-}
-
-const SPORT_EMOJI: Record<SportCode, string> = {
-  CYCLING: '🚴',
-  RUNNING: '🏃',
-  HIKING: '🥾',
-}
-
-const SPORT_LABEL: Record<SportCode, string> = {
-  CYCLING: 'Cyclisme',
-  RUNNING: 'Course',
-  HIKING: 'Randonnée',
 }
 
 /**

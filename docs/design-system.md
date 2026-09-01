@@ -113,3 +113,77 @@ téléchargeable — PHASE 9.
 La source fait 853 × 1280 px. Affichée entière, elle n'est jamais agrandie
 au-delà de sa taille propre sur un écran de hauteur courante — la question du
 piqué, qui se posait avec le recadrage plein cadre, ne se pose plus.
+
+## Hiérarchie : le sport devant
+
+Cyclo Dakar est d'abord une application d'**exercice**. Ce principe gouverne la
+navigation, pas seulement les couleurs.
+
+- L'écran d'accueil est **mon activité de la semaine** : trois anneaux, ma
+  régularité, mes dernières sorties. Pas un effectif, pas un solde.
+- Les adhérents, les participations, la trésorerie et l'administration sont
+  regroupés derrière **une seule entrée**, « Gestion du club », réservée aux
+  collecteurs et au-dessus. Un membre ordinaire ne la voit pas.
+- Sur mobile, l'accueil ne comporte plus **aucun** élément financier ni
+  d'effectif. Ces outils vivent sur le web.
+
+Ce n'est pas un rangement esthétique : mettre un solde de caisse en tête
+d'écran change ce que le club a l'air d'être aux yeux de ses membres.
+
+## Anneaux d'activité
+
+Trois anneaux concentriques, à la manière de l'application Forme : distance,
+temps en mouvement, sorties. Règles de dessin, identiques sur le web et le
+mobile :
+
+1. **L'anneau ne dépasse jamais un tour.** Le serveur renvoie bien 150 %, mais
+   un arc qui repasserait sur lui-même deviendrait illisible.
+2. **Un objectif atteint change d'aspect**, pas seulement de longueur — sinon
+   98 % et 102 % se ressemblent, alors que l'un est un échec et l'autre une
+   réussite.
+3. **L'animation part de zéro** : elle montre le remplissage, elle ne décore
+   pas.
+4. **Un `aria-label` détaillé** porte les trois chiffres et leurs objectifs :
+   un lecteur d'écran ne « voit » pas trois arcs.
+
+## Mouvement
+
+Trois durées, deux courbes, dans `tokens.css`. Au-delà, chaque écran invente la
+sienne et l'application perd son rythme.
+
+| Jeton | Valeur | Usage |
+|---|---|---|
+| `--cd-duration-fast` | 150 ms | survol, changement d'état |
+| `--cd-duration` | 260 ms | entrée d'un bloc, transition de page |
+| `--cd-duration-slow` | 900 ms | remplissage des anneaux |
+| `--cd-ease-out` | `cubic-bezier(.16,1,.3,1)` | ce qui apparaît |
+| `--cd-ease-spring` | `cubic-bezier(.34,1.56,.64,1)` | ce qui répond à un geste |
+
+Classes utilitaires : `.cd-rise`, `.cd-fade`, `.cd-pop`, `.cd-stagger`
+(cascade **plafonnée au huitième élément**, sans quoi le dernier apparaîtrait
+une seconde après le premier), `.cd-lift` (survol, jamais sur écran tactile).
+
+**`prefers-reduced-motion` neutralise tout** — sans masquer : une animation
+`both` laissée à son état initial cacherait la moitié de la page. Ce n'est pas
+une politesse ; pour une partie des utilisateurs, une animation non sollicitée
+provoque un vrai malaise physique.
+
+## Surfaces de verre
+
+Fond translucide **et** flou (`.cd-glass`, `.cd-glass-strong`,
+`.cd-glass-dark`), posés sur l'affiche du club. Les deux vont ensemble : sans
+le flou, le texte tombe sur les détails de la photo et devient illisible dès
+que l'image change. En mode sombre, le verre **assombrit** au lieu
+d'éclaircir — un panneau blanc translucide sur une photo éblouirait exactement
+celui qui a choisi le mode sombre.
+
+## Sports
+
+Quatre sports : cyclisme, course, **marche**, randonnée. La marche reprend le
+bleu de la course en plus clair — ce sont deux façons du même geste, et deux
+familles de couleur sans rapport rendraient la répartition par sport illisible.
+
+Icône, couleur et libellé vivent dans **un seul fichier** par plateforme
+(`web/src/lib/sports.ts`, `mobile/src/lib/sports.ts`), typés
+`Record<SportCode, …>` : TypeScript refuse de compiler tant qu'un sport manque,
+au lieu d'afficher un trou à l'exécution.

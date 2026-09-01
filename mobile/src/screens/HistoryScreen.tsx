@@ -21,20 +21,15 @@ import {
   formatElevation,
   formatSpeed,
 } from '../lib/format'
+import { SPORT_EMOJI } from '../lib/sports'
 import { fetchPersonalStats } from '../lib/stats'
 import { fontSize, radius, spacing } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
-import type { Activity, SportCode, StatsPeriod } from '../types/api'
+import type { Activity, StatsPeriod } from '../types/api'
 
 interface HistoryScreenProps {
   onBack: () => void
   onOpenActivity: (uuid: string) => void
-}
-
-const SPORT_EMOJI: Record<SportCode, string> = {
-  CYCLING: '🚴',
-  RUNNING: '🏃',
-  HIKING: '🥾',
 }
 
 const PERIODS: ReadonlyArray<{ value: StatsPeriod; label: string }> = [

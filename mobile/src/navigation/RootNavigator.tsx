@@ -86,8 +86,9 @@ function HomeNavigator() {
       <HomeStack.Screen name="HomeFeed">
         {({ navigation }) => (
           <HomeScreen
-            onOpenMembers={() => navigation.getParent()?.navigate('Membres')}
             onOpenHistory={() => navigation.navigate('History')}
+            onOpenActivity={(uuid) => navigation.navigate('ActivityDetail', { uuid })}
+            onOpenEvents={() => navigation.getParent()?.navigate('Sorties')}
           />
         )}
       </HomeStack.Screen>

@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { StatusBar } from 'expo-status-bar'
+import { ChevronRight } from 'lucide-react-native'
+import { useEffect, useRef } from 'react'
 import {
+  Animated,
+  Easing,
   Image,
   Pressable,
   RefreshControl,
@@ -10,194 +14,251 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { ActivityRings, type RingConfig } from '../components/ActivityRings'
 import { ApiError } from '../lib/api'
-import { formatDistance, formatDurationLong } from '../lib/format'
+import { fetchActivities } from '../lib/activities'
+import {
+  formatDate,
+  formatDistance,
+  formatDurationLong,
+  formatSpeed,
+} from '../lib/format'
+import { SPORT_EMOJI } from '../lib/sports'
 import { fetchDashboardStats, fetchPersonalStats } from '../lib/stats'
 import { useCurrentUser } from '../stores/auth'
-import { fontSize, radius, spacing } from '../theme/tokens'
+import { brand, fontSize, radius, spacing } from '../theme/tokens'
 import { useTheme } from '../theme/useTheme'
-import type { MemberStatusCode } from '../types/api'
+import type { Activity } from '../types/api'
 
 interface HomeScreenProps {
-  onOpenMembers: () => void
   onOpenHistory: () => void
+  onOpenActivity: (uuid: string) => void
+  onOpenEvents: () => void
 }
 
+const RING_CONFIGS: RingConfig[] = [
+  { key: 'distance_m', label: 'Distance', color: brand.orange },
+  { key: 'moving_time_s', label: 'Mouvement', color: brand.blue },
+  { key: 'activities', label: 'Sorties', color: brand.green },
+]
+
 /**
- * Accueil de l'application connectée.
+ * Accueil : **l'exercice, et rien d'autre**.
  *
- * Même règle que sur le web : **aucun chiffre inventé**. Les effectifs sont
- * réels ; les modules à venir affichent leur phase, jamais un zéro qui
- * passerait pour une mesure.
+ * L'écran s'ouvrait sur les effectifs du club. Il s'ouvre désormais sur ce que
+ * le membre a fait cette semaine. Les effectifs, les participations et la
+ * caisse ne sont plus ici du tout — ils vivent sur le web, derrière la page
+ * « Gestion du club ». Un membre sort son téléphone pour enregistrer une
+ * sortie, pas pour consulter un solde.
  *
- * Depuis la phase 8, l'écran ouvre sur MES chiffres : ce qu'un membre vient
- * vérifier après une sortie, c'est son propre cumul, pas l'effectif du club.
- * Les statistiques du club restent en dessous.
+ * L'ordre de lecture : mes anneaux, ma régularité, mes dernières sorties, la
+ * prochaine sortie du club.
  */
-export function HomeScreen({ onOpenMembers, onOpenHistory }: HomeScreenProps) {
+export function HomeScreen({
+  onOpenHistory,
+  onOpenActivity,
+  onOpenEvents,
+}: HomeScreenProps) {
   const { colors, isDark } = useTheme()
   const user = useCurrentUser()
 
   const stats = useQuery({
-    queryKey: ['stats', 'dashboard'],
-    queryFn: fetchDashboardStats,
-  })
-
-  // Cumuls du mois en cours : la période que le membre consulte le plus.
-  const mine = useQuery({
-    queryKey: ['stats', 'me', 'month'],
-    queryFn: () => fetchPersonalStats('month'),
-    // Un compte sans fiche membre reçoit un 404 assumé : inutile d'insister.
+    queryKey: ['stats', 'me', 'week'],
+    queryFn: () => fetchPersonalStats('week'),
     retry: (count, error) =>
       !(error instanceof ApiError && error.code === 'NO_MEMBER_PROFILE') && count < 2,
   })
 
-  const members = stats.data?.members
-  const myTotals = mine.data?.totals
+  const recent = useQuery({
+    queryKey: ['activities', 'mine', 'recent'],
+    queryFn: () => fetchActivities({ mine: true, per_page: 3 }),
+  })
+
+  const club = useQuery({
+    queryKey: ['stats', 'dashboard'],
+    queryFn: fetchDashboardStats,
+  })
+
+  const noProfile =
+    stats.error instanceof ApiError && stats.error.code === 'NO_MEMBER_PROFILE'
+
+  const rings = stats.data?.rings
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]} edges={['top']}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <StatusBar style="light" />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl
-            refreshing={stats.isFetching}
-            onRefresh={() => void stats.refetch()}
+            refreshing={stats.isFetching && !stats.isLoading}
+            onRefresh={() => {
+              void stats.refetch()
+              void recent.refetch()
+            }}
             tintColor={colors.orange}
             colors={[colors.orange]}
           />
         }
       >
-        {/* --- En-tête orange ---------------------------------------------- */}
-        <View style={[styles.hero, { backgroundColor: colors.orange }]}>
-          <View style={styles.heroRow}>
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.logo}
-              accessibilityLabel="Logo Cyclo Dakar"
-            />
-            <View style={styles.flex}>
-              <Text style={styles.heroKicker}>{user?.role_label}</Text>
-              <Text style={styles.heroTitle} numberOfLines={1}>
-                {/* Le prénom seul : plus chaleureux, et plus court sur mobile. */}
-                Bonjour {user?.name.split(' ')[0]}
-              </Text>
-            </View>
+        {/* --- Bandeau : l'affiche du club, en verre ---------------------- */}
+        <View style={styles.hero}>
+          <Image
+            source={require('../../assets/hero.jpg')}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            accessible={false}
+          />
+          {/* L'affiche est très contrastée : sans ce voile, le texte blanc
+              tomberait tantôt sur du noir, tantôt sur un gilet fluo. */}
+          <View style={styles.heroVeil} />
+
+          <View style={styles.heroBody}>
+            <Text style={styles.heroKicker}>CETTE SEMAINE</Text>
+            <Text style={styles.heroTitle} numberOfLines={1}>
+              Bonjour {user?.name.split(' ')[0] ?? ''}
+            </Text>
+
+            <FadeIn>
+              {rings !== undefined ? (
+                <ActivityRings rings={rings} configs={RING_CONFIGS} size={172} />
+              ) : (
+                <View style={styles.ringPlaceholder} />
+              )}
+            </FadeIn>
+
+            {rings !== undefined && (
+              <View style={styles.legend}>
+                {RING_CONFIGS.map((config) => {
+                  const metric = rings.metrics[config.key]
+                  const format =
+                    config.key === 'distance_m'
+                      ? formatDistance
+                      : config.key === 'moving_time_s'
+                        ? formatDurationLong
+                        : String
+
+                  return (
+                    <View key={config.key} style={styles.legendItem}>
+                      <View style={[styles.dot, { backgroundColor: config.color }]} />
+                      <Text style={styles.legendValue}>{format(metric.value)}</Text>
+                      <Text style={styles.legendGoal}>/ {format(metric.goal)}</Text>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
           </View>
-          <Text style={styles.heroMotto}>Ensemble, plus loin, plus forts !</Text>
         </View>
 
-        {/* --- Mes chiffres du mois ---------------------------------------- */}
+        {noProfile && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.muted, { color: colors.textMuted }]}>
+              Votre compte n'est pas encore rattaché à une fiche membre. Contactez
+              le bureau du club pour pouvoir enregistrer vos sorties.
+            </Text>
+          </View>
+        )}
+
+        {/* --- Régularité -------------------------------------------------- */}
+        {rings !== undefined && (
+          <View
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Régularité</Text>
+
+            <View style={styles.week}>
+              {rings.days.map((day) => (
+                <View
+                  key={day.date}
+                  style={[
+                    styles.day,
+                    {
+                      backgroundColor: day.active ? colors.orange : colors.surface2,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dayLabel,
+                      { color: day.active ? colors.black : colors.textMuted },
+                    ]}
+                  >
+                    {day.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Le nombre de jours actifs dit ce que le cumul ne dit pas :
+                rouler 40 km en une fois n'est pas rouler 40 km en quatre. */}
+            <Text style={[styles.muted, { color: colors.textMuted }]}>
+              {rings.days.filter((day) => day.active).length} jour
+              {rings.days.filter((day) => day.active).length > 1 ? 's' : ''} d'activité
+              sur les sept.
+            </Text>
+          </View>
+        )}
+
+        {/* --- Dernières sorties ------------------------------------------ */}
         <View
           style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.cardHead}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Ce mois-ci</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Mes sorties</Text>
             <Pressable onPress={onOpenHistory} hitSlop={8}>
-              <Text style={[styles.link, { color: colors.orangeText }]}>Mes sorties →</Text>
+              <Text style={[styles.link, { color: colors.orangeText }]}>Tout voir →</Text>
             </Pressable>
           </View>
 
-          {mine.isLoading && (
-            <Text style={[styles.muted, { color: colors.textMuted }]}>Chargement…</Text>
-          )}
-
-          {/* Un compte sans fiche membre n'a pas de statistiques : ce n'est
-              pas une panne, et le dire vaut mieux qu'un message d'erreur. */}
-          {mine.error instanceof ApiError && mine.error.code === 'NO_MEMBER_PROFILE' && (
+          {recent.isSuccess && recent.data.data.length === 0 && (
             <Text style={[styles.muted, { color: colors.textMuted }]}>
-              Votre compte n'est pas encore rattaché à une fiche membre.
+              Aucune sortie enregistrée. Touchez « Démarrer » pour votre première
+              sortie — vélo, course, randonnée ou marche.
             </Text>
           )}
 
-          {myTotals && (
-            <View style={styles.statRow}>
-              <Stat
-                value={formatDistance(myTotals.distance_m)}
-                label="parcourus"
-                primary
-              />
-              <Stat value={String(myTotals.activities)} label="sorties" />
-              <Stat
-                value={formatDurationLong(myTotals.moving_time_s)}
-                label="en mouvement"
-              />
-            </View>
-          )}
+          {recent.data?.data.map((activity) => (
+            <ActivityRow
+              key={activity.uuid}
+              activity={activity}
+              onPress={() => onOpenActivity(activity.uuid)}
+            />
+          ))}
         </View>
 
-        {/* --- Effectif du club --------------------------------------------- */}
-        <View
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <View style={styles.cardHead}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Le club</Text>
-            <Pressable onPress={onOpenMembers} hitSlop={8}>
-              <Text style={[styles.link, { color: colors.orangeText }]}>Annuaire →</Text>
-            </Pressable>
-          </View>
-
-          {stats.isLoading && (
-            <Text style={[styles.muted, { color: colors.textMuted }]}>Chargement…</Text>
-          )}
-
-          {stats.isError && (
-            <View style={[styles.alert, { backgroundColor: colors.dangerSoft }]}>
-              <Text style={[styles.alertText, { color: colors.danger }]}>
-                Statistiques indisponibles. Vérifiez votre connexion.
+        {/* --- Prochaine sortie du club ------------------------------------ */}
+        {club.data?.events.next != null && (
+          <Pressable
+            onPress={onOpenEvents}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.card,
+              styles.nextEvent,
+              {
+                backgroundColor: pressed ? colors.surface2 : colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.flex}>
+              <Text style={[styles.muted, { color: colors.textMuted }]}>
+                Prochaine sortie du club
+              </Text>
+              <Text style={[styles.nextTitle, { color: colors.text }]} numberOfLines={1}>
+                {club.data.events.next.title}
+              </Text>
+              <Text style={[styles.muted, { color: colors.textMuted }]} numberOfLines={1}>
+                {club.data.events.next.starts_at !== null &&
+                  formatDate(club.data.events.next.starts_at)}
+                {' · '}
+                {club.data.events.next.location_name}
               </Text>
             </View>
-          )}
-
-          {members && (
-            <>
-              <View style={styles.statRow}>
-                <Stat value={members.active} label="membres actifs" primary />
-                <Stat value={members.joined_this_month} label="ce mois-ci" />
-                <Stat value={members.without_account} label="sans compte" />
-              </View>
-
-              <View style={styles.breakdown}>
-                {(
-                  Object.entries(members.by_status) as [
-                    MemberStatusCode,
-                    { label: string; count: number },
-                  ][]
-                )
-                  .filter(([, entry]) => entry.count > 0)
-                  .map(([code, entry]) => (
-                    <View key={code} style={styles.breakdownRow}>
-                      <View
-                        style={[styles.dot, { backgroundColor: statusColor(code, colors) }]}
-                      />
-                      <Text style={[styles.breakdownLabel, { color: colors.text }]}>
-                        {entry.label}
-                      </Text>
-                      <Text style={[styles.breakdownCount, { color: colors.textMuted }]}>
-                        {entry.count}
-                      </Text>
-                    </View>
-                  ))}
-              </View>
-            </>
-          )}
-        </View>
-
-        {/* --- Ce qui arrive ------------------------------------------------ */}
-        <View
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Prochainement</Text>
-          <Text style={[styles.cardSub, { color: colors.textMuted }]}>
-            Les modules arrivent phase par phase.
-          </Text>
-
-          <Upcoming emoji="📅" label="Événements du club" phase={9} />
-          <Upcoming emoji="📷" label="Scanner un QR Code membre" phase={11} />
-          <Upcoming emoji="💰" label="Mes participations" phase={12} />
-        </View>
+            <ChevronRight color={colors.textMuted} size={18} />
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -205,121 +266,156 @@ export function HomeScreen({ onOpenMembers, onOpenHistory }: HomeScreenProps) {
 
 /* -------------------------------------------------------------------------- */
 
-type Colors = ReturnType<typeof useTheme>['colors']
+/**
+ * Apparition en fondu montant.
+ *
+ * `useNativeDriver` est possible ici — opacité et translation sont toutes deux
+ * pilotables nativement, donc l'animation ne repasse pas par le fil JavaScript
+ * et reste fluide même pendant le chargement des données.
+ */
+function FadeIn({ children }: { children: React.ReactNode }) {
+  const value = useRef(new Animated.Value(0)).current
 
-function statusColor(status: MemberStatusCode, colors: Colors): string {
-  return {
-    ACTIVE: colors.green,
-    PENDING: colors.warning,
-    SUSPENDED: colors.danger,
-    FORMER: colors.borderStrong,
-  }[status]
-}
-
-function Stat({
-  value,
-  label,
-  primary,
-}: {
-  /** Déjà formatée quand elle porte une unité (« 215 km »). */
-  value: number | string
-  label: string
-  primary?: boolean
-}) {
-  const { colors } = useTheme()
+  useEffect(() => {
+    Animated.timing(value, {
+      toValue: 1,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start()
+  }, [value])
 
   return (
-    <View style={styles.stat}>
-      <Text
-        style={[
-          styles.statValue,
-          { color: primary ? colors.orangeText : colors.text },
-        ]}
-      >
-        {value}
-      </Text>
-      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
-    </View>
+    <Animated.View
+      style={{
+        opacity: value,
+        transform: [
+          { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+        ],
+      }}
+    >
+      {children}
+    </Animated.View>
   )
 }
 
-function Upcoming({
-  emoji,
-  label,
-  phase,
+function ActivityRow({
+  activity,
+  onPress,
 }: {
-  emoji: string
-  label: string
-  phase: number
+  activity: Activity
+  onPress: () => void
 }) {
   const { colors } = useTheme()
 
   return (
-    <View style={[styles.upcoming, { backgroundColor: colors.surface2 }]}>
-      <Text style={styles.upcomingEmoji}>{emoji}</Text>
-      <Text style={[styles.upcomingLabel, { color: colors.text }]}>{label}</Text>
-      <Text style={[styles.upcomingPhase, { color: colors.textMuted }]}>P{phase}</Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.activity,
+        { backgroundColor: pressed ? colors.surface2 : 'transparent' },
+      ]}
+    >
+      <Text style={styles.activityEmoji}>{SPORT_EMOJI[activity.sport]}</Text>
+
+      <View style={styles.flex}>
+        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+          {activity.title}
+        </Text>
+        <Text style={[styles.muted, { color: colors.textMuted }]}>
+          {activity.started_at !== null ? formatDate(activity.started_at) : '—'}
+        </Text>
+        <View style={styles.activityStats}>
+          <Text style={[styles.activityStat, { color: colors.orangeText }]}>
+            {formatDistance(activity.distance_m)}
+          </Text>
+          <Text style={[styles.activityStat, { color: colors.textMuted }]}>
+            {formatDurationLong(activity.moving_time_s)}
+          </Text>
+          <Text style={[styles.activityStat, { color: colors.textMuted }]}>
+            {formatSpeed(activity.avg_speed_mps)}
+          </Text>
+        </View>
+      </View>
+
+      <ChevronRight color={colors.textMuted} size={16} />
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
 
-  hero: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  logo: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff' },
+  hero: {
+    overflow: 'hidden',
+    borderRadius: radius.lg,
+    minHeight: 380,
+  },
+  heroVeil: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+  heroBody: { alignItems: 'center', gap: spacing.md, padding: spacing.lg },
   heroKicker: {
     fontSize: fontSize.caption,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    color: 'rgba(0,0,0,0.6)',
-    textTransform: 'uppercase',
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: 'rgba(255,255,255,0.7)',
   },
-  heroTitle: { fontSize: fontSize.h2, fontWeight: '800', color: '#1A1A1A' },
-  heroMotto: { fontSize: fontSize.small, color: 'rgba(0,0,0,0.7)' },
+  heroTitle: { fontSize: fontSize.h1, fontWeight: '800', color: '#FFFFFF' },
+  ringPlaceholder: {
+    width: 172,
+    height: 172,
+    borderRadius: 86,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  legendValue: { fontSize: fontSize.small, fontWeight: '700', color: '#FFFFFF' },
+  legendGoal: { fontSize: fontSize.small, color: 'rgba(255,255,255,0.6)' },
 
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     padding: spacing.lg,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-  cardHead: {
-    flexDirection: 'row',
+  cardHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  cardTitle: { fontSize: fontSize.body, fontWeight: '700' },
+  link: { fontSize: fontSize.small, fontWeight: '600' },
+  muted: { fontSize: fontSize.small, lineHeight: 19 },
+
+  week: { flexDirection: 'row', gap: spacing.xs, marginVertical: spacing.xs },
+  day: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: radius.sm,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  cardTitle: { fontSize: fontSize.h3, fontWeight: '700' },
-  cardSub: { fontSize: fontSize.small, marginBottom: spacing.xs },
-  link: { fontSize: fontSize.small, fontWeight: '700' },
-  muted: { fontSize: fontSize.small, marginTop: spacing.sm },
+  dayLabel: { fontSize: fontSize.caption, fontWeight: '800' },
 
-  alert: { borderRadius: radius.sm, padding: spacing.md, marginTop: spacing.sm },
-  alertText: { fontSize: fontSize.small, fontWeight: '600', lineHeight: 19 },
-
-  statRow: { flexDirection: 'row', marginTop: spacing.md },
-  stat: { flex: 1, alignItems: 'center', gap: 2 },
-  statValue: { fontSize: fontSize.h1, fontWeight: '800' },
-  statLabel: { fontSize: fontSize.caption, textAlign: 'center' },
-
-  breakdown: { marginTop: spacing.lg, gap: spacing.sm },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  breakdownLabel: { flex: 1, fontSize: fontSize.small },
-  breakdownCount: { fontSize: fontSize.small, fontWeight: '700' },
-
-  upcoming: {
+  activity: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.md,
     borderRadius: radius.sm,
-    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  upcomingEmoji: { fontSize: 20 },
-  upcomingLabel: { flex: 1, fontSize: fontSize.body, fontWeight: '600' },
-  upcomingPhase: { fontSize: fontSize.caption, fontWeight: '700' },
+  activityEmoji: { fontSize: 26 },
+  activityTitle: { fontSize: fontSize.small, fontWeight: '600' },
+  activityStats: { flexDirection: 'row', gap: spacing.md, marginTop: 2 },
+  activityStat: { fontSize: fontSize.caption, fontWeight: '600' },
+
+  nextEvent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  nextTitle: { fontSize: fontSize.body, fontWeight: '700' },
 })

@@ -203,9 +203,28 @@ export const personalStats = (overrides: Partial<PersonalStats> = {}): PersonalS
     elevation_gain_m: 340,
     avg_speed_mps: 7.422,
   },
+  goals: { distance_m: 20_000, moving_time_s: 7_200, activities: 3 },
+  rings: {
+    week_start: '2026-08-31',
+    metrics: {
+      distance_m: { value: 24_500, goal: 20_000, percent: 122.5, completed: true },
+      moving_time_s: { value: 5_400, goal: 7_200, percent: 75, completed: false },
+      activities: { value: 2, goal: 3, percent: 66.7, completed: false },
+    },
+    days: [
+      { date: '2026-08-31', label: 'L', distance_m: 18_000, active: true },
+      { date: '2026-09-01', label: 'M', distance_m: 6_500, active: true },
+      { date: '2026-09-02', label: 'M', distance_m: 0, active: false },
+      { date: '2026-09-03', label: 'J', distance_m: 0, active: false },
+      { date: '2026-09-04', label: 'V', distance_m: 0, active: false },
+      { date: '2026-09-05', label: 'S', distance_m: 0, active: false },
+      { date: '2026-09-06', label: 'D', distance_m: 0, active: false },
+    ],
+  },
   by_sport: {
     CYCLING: { label: 'Cyclisme', activities: 5, distance_m: 190_000, moving_time_s: 24_000 },
     RUNNING: { label: 'Course', activities: 2, distance_m: 24_500, moving_time_s: 4_900 },
+    WALKING: { label: 'Marche', activities: 3, distance_m: 9_000, moving_time_s: 6_400 },
     HIKING: { label: 'Randonnée', activities: 0, distance_m: 0, moving_time_s: 0 },
   },
   records: {
