@@ -114,10 +114,15 @@ final class ReplayBuilder
      *
      * Reprend mot pour mot les regles d'`ActivityStatsCalculator` :
      *
-     *  - une ANCRE, qui ne bouge que sur un deplacement reel ;
+     *  - une ANCRE, qui ne bouge QUE sur un deplacement reel — et qui reste
+     *    en place dans tous les autres cas, ce qui evite de perdre les metres
+     *    deja parcourus ;
      *  - un seuil de distance par sport, releve a deux fois la precision
      *    annoncee par l'appareil ;
-     *  - un seuil de vitesse, qui demasque la derive d'un recepteur immobile.
+     *  - une CONFIRMATION de deux secondes, qui separe un depart d'un sursaut
+     *    de derive ;
+     *  - un seuil de vitesse PAR SPORT, qui demasque la derive d'un recepteur
+     *    immobile sans confondre une flanerie avec un arret.
      *
      * Sans cela, la video afficherait une distance qui grimpe alors que le
      * membre est a l'arret, et se terminerait sur un chiffre different de
@@ -134,8 +139,14 @@ final class ReplayBuilder
             "cyclo.sports.{$sport}.min_distance_m",
             config('cyclo.gps.min_segment_m', 1.0),
         );
-        $idleSpeed = (float) config('cyclo.gps.idle_speed_mps', 0.8);
+        $idleSpeed = (float) config(
+            "cyclo.sports.{$sport}.idle_speed_mps",
+            config('cyclo.gps.idle_speed_mps', 0.8),
+        );
         $factor = (float) config('cyclo.gps.accuracy_factor', 2.0);
+        $confirm = (float) config('cyclo.gps.confirm_move_s', 2.0);
+
+        $pendingAt = null;
 
         $cumulative = [0.0];
         $distance = 0.0;
@@ -161,20 +172,53 @@ final class ReplayBuilder
                     $this->uncertainty($anchor, $current) * $factor,
                 );
 
-                if ($segment >= $threshold) {
+                if ($segment < $threshold) {
+                    // Sous le seuil : bruit. L'ancre RESTE, et un
+                    // franchissement en attente est annule — c'etait un
+                    // sursaut de derive, pas un depart.
+                    $pendingAt = null;
+                } else {
+                    $pendingAt ??= $at;
+
                     $speed = $segment / $elapsed;
 
-                    if ($speed >= $idleSpeed) {
-                        // Deplacement reel : on compte, et l'ancre suit.
+                    if ($at - $pendingAt >= $confirm && $speed >= $idleSpeed) {
+                        // Deplacement reel et confirme : on compte, et
+                        // l'ancre suit.
                         $distance += $segment;
                         $anchor = $current;
                         $anchorAt = $at;
-                    } else {
-                        // Trop lent : derive ou arret. L'ancre avance sans
-                        // rien compter — voir ActivityStatsCalculator.
-                        $anchor = $current;
-                        $anchorAt = $at;
+                        $pendingAt = null;
                     }
+                    // Sinon l'ancre RESTE : les metres attendent au lieu
+                    // d'etre perdus. C'etait le defaut de la version
+                    // precedente, qui avancait l'ancre au rejet.
+                }
+            }
+
+            /*
+             | LES DERNIERS METRES, comme sur la fiche.
+             |
+             | Au dernier point il n'y a plus rien a confirmer : ce qui reste
+             | entre l'ancre et l'arrivee doit etre credite, sinon la video se
+             | terminerait sur un chiffre inferieur a celui de la sortie — et
+             | c'est exactement l'ecart qu'un membre remarque.
+             |
+             | Memes garde-fous que dans `ActivityStatsCalculator` : il faut
+             | qu'un deplacement ait deja ete prouve, que la distance depasse
+             | le plancher du sport, et que l'allure soit celle de quelqu'un
+             | qui bouge.
+             */
+            if ($i === $n - 1 && $distance > 0.0 && $elapsed > 0) {
+                $reste = $this->haversine(
+                    (float) $anchor->lat,
+                    (float) $anchor->lng,
+                    (float) $current->lat,
+                    (float) $current->lng,
+                );
+
+                if ($reste >= $minSegment && $reste / $elapsed >= $idleSpeed) {
+                    $distance += $reste;
                 }
             }
 

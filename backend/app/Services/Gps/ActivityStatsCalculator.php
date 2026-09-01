@@ -122,11 +122,45 @@ final class ActivityStatsCalculator
             config('cyclo.gps.min_segment_m', 1.0),
         );
 
-        $idleSpeed = (float) config('cyclo.gps.idle_speed_mps', 0.8);
+        /*
+         | Vitesse en deca de laquelle on n'est pas « en mouvement », PAR SPORT.
+         |
+         | Elle ne sert plus qu'a compter le TEMPS ACTIF. Un seuil global de
+         | 0,8 m/s (2,9 km/h) etait deja de la marche : une flanerie, une
+         | montee, une promenade avec un enfant passent toutes en dessous. Le
+         | velo garde 0,8 — sous cette allure on pousse son velo.
+         */
+        $idleSpeed = (float) config(
+            "cyclo.sports.{$sport->value}.idle_speed_mps",
+            config('cyclo.gps.idle_speed_mps', 0.8),
+        );
+
+        /*
+         | Duree de CONFIRMATION d'un franchissement, en secondes.
+         |
+         | Voir le long commentaire plus bas, au moment du credit.
+         */
+        $confirmSeconds = (float) config('cyclo.gps.confirm_move_s', 2.0);
+
+        // Franchissement en attente de confirmation : [point, distance].
+        $pending = null;
 
         $distance = 0.0;
-        $movingTime = 0.0;
         $maxSpeed = 0.0;
+
+        /*
+         | LE TEMPS ACTIF EST CALCULE A PART, ET C'EST DELIBERE.
+         |
+         | « Quelle distance a-t-il parcourue ? » et « bougeait-il a cet
+         | instant ? » sont deux questions differentes, et les melanger a
+         | produit un defaut concret : l'ancre de distance reste en place
+         | pendant un arret — c'est justement ce qui evite de perdre les
+         | metres deja parcourus — mais le temps ecoule depuis cette ancre
+         | inclut alors l'arret tout entier. Un feu rouge de trois minutes
+         | entrait ainsi dans le temps de roulage, et la vitesse moyenne
+         | affichee devenait incomprehensible.
+         */
+        $movingTime = $this->movingTime($points, $minSegment);
 
         $splits = [];
         $splitDistance = 0.0;
@@ -207,49 +241,88 @@ final class ActivityStatsCalculator
             $seuil = max($minSegment, $this->uncertainty($anchor, $current));
 
             if ($segment < $seuil) {
+                /*
+                 | Sous le seuil : c'est le tremblement du GPS, pas un
+                 | deplacement. On ignore le point ET ON GARDE L'ANCRE.
+                 |
+                 | Garder l'ancre est essentiel : c'est en l'avancant que la
+                 | version d'origine accumulait le bruit, et c'est en la
+                 | gardant qu'une marche lente finit par etre comptee. A
+                 | 0,6 m/s, il faut une quinzaine de secondes pour franchir
+                 | 10 m — mais on les franchit, et ils sont credites.
+                 |
+                 | Un franchissement en attente qui retombe sous le seuil est
+                 | ANNULE : c'etait un sursaut de derive, pas un depart.
+                 */
+                $pending = null;
+
                 continue;
             }
+
+            /*
+             | LE FRANCHISSEMENT DOIT SE CONFIRMER.
+             |
+             | Sans cette regle, un recepteur immobile finit par compter des
+             | metres : l'erreur GPS n'est pas un bruit blanc, elle DERIVE de
+             | facon correlee et franchit donc n'importe quel seuil de
+             | distance si on lui laisse le temps. C'est ce qui affichait 67 m
+             | a l'arret complet.
+             |
+             | La version precedente tranchait par la vitesse moyenne depuis
+             | l'ancre. C'etait une erreur, et elle coutait cher :
+             |
+             |   - une flanerie a 0,6 m/s tombait sous le seuil et n'etait
+             |     JAMAIS comptee — 72 m reels affiches 0 m ;
+             |   - pire, l'ancre AVANCAIT au rejet, ce qui jetait les metres
+             |     deja parcourus. Une marche avec arrets perdait la moitie de
+             |     sa distance : 96 m reels comptes 43 m, parce que chaque
+             |     arret effacait le trajet qui le precedait.
+             |
+             | La confirmation separe proprement les deux questions. Un
+             | deplacement REEL s'eloigne de l'ancre et Y RESTE ; une derive
+             | franchit le seuil puis revient. On attend donc quelques
+             | secondes avant de crediter, et on annule si le point retombe.
+             |
+             | Ce que cette regle coute : les deux dernieres secondes d'une
+             | sortie qui s'arrete pile sur un franchissement. Ce qu'elle
+             | evite : compter du vent.
+             */
+            if ($pending === null) {
+                $pending = $current;
+            }
+
+            if ($pending->secondsSince($anchor) > 0.0
+                && $current->secondsSince($pending) < $confirmSeconds) {
+                // Franchi, mais pas encore confirme. L'ancre ne bouge pas :
+                // les metres ne sont ni perdus ni comptes, seulement en
+                // attente.
+                continue;
+            }
+
+            $pending = null;
 
             $speed = $segment / $elapsed;
 
             /*
-             | Trop lent pour etre un deplacement.
+             | TROP LENT POUR ETRE UN DEPLACEMENT — et l'ancre RESTE.
              |
-             | Le seuil de distance seul ne suffit pas : un recepteur immobile
-             | ne tremble pas au hasard, il DERIVE lentement, de plusieurs
-             | metres en une minute. La derive finit donc par franchir
-             | n'importe quel seuil de distance, l'ancre suit, et le cycle
-             | recommence — 50 m accumules en cinq minutes sur une table.
+             | Ce garde-fou existait deja. Ce qui etait faux, ce n'etait pas
+             | son principe mais sa consequence : au rejet, l'ancre AVANCAIT,
+             | ce qui jetait pour de bon les metres deja parcourus. Une marche
+             | ponctuee d'arrets perdait ainsi la moitie de sa distance.
              |
-             | La vitesse tranche : 10 m parcourus en 60 s font 0,17 m/s.
-             | Personne ne roule ni ne marche a cette allure. On ignore le
-             | point ET ON GARDE L'ANCRE, sans quoi la derive repartirait de
-             | sa nouvelle position.
+             | Ici l'ancre ne bouge pas. Les metres ne sont ni comptes ni
+             | perdus : ils attendent. Un marcheur arrete a un feu les
+             | retrouve des qu'il repart, et une derive, elle, n'atteindra
+             | jamais l'allure necessaire — 20 m parcourus en 4 minutes font
+             | 0,08 m/s, ce qui n'est le pas de personne.
              |
-             | Un cycliste sous 0,8 m/s pousse son velo : ne pas compter ces
-             | metres est coherent avec le « temps en mouvement », qui les
-             | exclut deja.
+             | Le seuil est PAR SPORT, et c'est decisif : les 0,8 m/s
+             | uniformes d'avant (2,9 km/h) sont deja une allure de marche.
+             | Ils effacaient purement et simplement toute promenade tranquille
+             | — 72 m reels affiches 0 m.
              */
             if ($speed < $idleSpeed) {
-                /*
-                 | ICI l'ancre AVANCE, contrairement au cas precedent.
-                 |
-                 | Cette lenteur peut venir de deux situations, et l'ancre
-                 | doit suivre dans les deux :
-                 |
-                 |  - une derive : les points suivants repartiront de la
-                 |    nouvelle position, sans jamais rien accumuler puisque
-                 |    la derive reste lente ;
-                 |  - un ARRET REEL suivi d'un depart. Si l'ancre restait
-                 |    figee, le temps de l'arret finirait par etre credite au
-                 |    premier segment roule — un feu rouge de trois minutes
-                 |    compte comme du temps actif.
-                 |
-                 | Le tremblement vif, lui, reste bloque par le seuil de
-                 | distance au-dessus, qui garde l'ancre.
-                 */
-                $anchor = $current;
-
                 continue;
             }
 
@@ -261,10 +334,18 @@ final class ActivityStatsCalculator
 
             $distance += $segment;
 
-            // Tout ce qui parvient ici depasse la vitesse de marche lente :
-            // les feux rouges, ravitaillements et photos ont ete ecartes
-            // au-dessus, avec la derive.
-            $movingTime += $elapsed;
+            /*
+             | Le TEMPS ACTIF, lui, exclut toujours les allures d'arret.
+             |
+             | C'est ici — et non plus sur la distance — qu'intervient la
+             | vitesse minimale. Un feu rouge de trois minutes fait bien
+             | partie du trajet parcouru, mais pas du temps passe a rouler :
+             | l'inclure ferait chuter la vitesse moyenne et rendrait
+             | incomprehensible l'allure affichee.
+             */
+            // Le temps actif ne se calcule PAS ici : voir `movingTime()`,
+            // plus bas. L'ancre pouvant rester en place pendant un feu rouge,
+            // `elapsed` inclut parfois trois minutes d'arret.
             $maxSpeed = max($maxSpeed, $smoothedSpeed);
 
             $bucket = (string) (int) floor($speed * 3.6 / 5) * 5;
@@ -295,6 +376,77 @@ final class ActivityStatsCalculator
 
             // Le deplacement est reel : l'ancre suit.
             $anchor = $current;
+        }
+
+        /*
+         | LES DERNIERS METRES.
+         |
+         | Le seuil est une regle de PREUVE, pas une regle de comptage : tant
+         | qu'on n'a pas franchi la distance qui prouve un deplacement, on
+         | attend. Mais a la fin de la trace, il n'y a plus rien a attendre —
+         | et sans ce rattrapage, tout ce qui restait sous le seuil est perdu
+         | pour de bon.
+         |
+         | Sur une longue sortie, cela ne represente qu'une poignee de metres.
+         | Sur une marche de deux minutes, c'etait la MOITIE du trajet, et sur
+         | un aller-retour de 12 m la totalite : l'ecran affichait 0 m a
+         | quelqu'un qui venait de marcher.
+         |
+         | Deux conditions, et elles suffisent :
+         |
+         | TROIS conditions, et la premiere est la plus importante :
+         |
+         |  - LA SORTIE A DEJA PROUVE UN DEPLACEMENT (`$distance > 0`). Sans
+         |    elle, un telephone pose sur une table crediterait sa derniere
+         |    oscillation : la derive d'un recepteur immobile atteint 1,9 m/s
+         |    par moments, ce qui passerait n'importe quel test de vitesse.
+         |    On ne complete que ce qu'on a deja constate ;
+         |  - la distance depasse le plancher du sport (8 m a pied), donc on
+         |    ne credite pas un tremblement ;
+         |  - l'allure est celle de quelqu'un qui bouge.
+         |
+         | Consequence assumee : une marche de dix metres et de dix secondes
+         | affiche zero. C'est la verite — a huit metres de precision, dix
+         | metres ne se prouvent pas. Mieux vaut ne rien annoncer que de
+         | promettre une precision qu'aucun telephone n'a.
+         */
+        $dernier = null;
+
+        for ($i = count($points) - 1; $i >= 0; $i--) {
+            if (! $points[$i]->isPaused) {
+                $dernier = $points[$i];
+
+                break;
+            }
+        }
+
+        if ($dernier !== null && $dernier !== $anchor) {
+            $reste = Distance::between($anchor, $dernier);
+            $duree = $dernier->secondsSince($anchor);
+
+            if ($distance > 0.0
+                && $reste >= $minSegment
+                && $duree > 0.0
+                && $reste / $duree >= $idleSpeed) {
+                // La DISTANCE seulement : le temps de ces secondes est deja
+                // compte par la fenetre glissante, qui parcourt toute la
+                // trace. L'ajouter ici le compterait deux fois — le temps
+                // actif depassait alors la duree totale de la sortie.
+                $distance += $reste;
+            }
+        }
+
+        /*
+         | Pas de deplacement prouve, pas de temps de deplacement.
+         |
+         | Meme principe que pour les derniers metres : la fenetre glissante
+         | peut compter quelques secondes sur l'oscillation d'un recepteur
+         | pose. Annoncer « 0 m parcourus en 9 s de mouvement » n'a aucun sens
+         | pour le membre, et l'allure calculee sur ces neuf secondes serait
+         | une aberration.
+         */
+        if ($distance <= 0.0) {
+            $movingTime = 0.0;
         }
 
         return [
@@ -341,6 +493,71 @@ final class ActivityStatsCalculator
      * que le club ne demande pas — on ne renvoie rien plutôt qu'un chiffre
      * calculé sur un poids moyen inventé.
      */
+    /**
+     * Temps reellement passe en mouvement, en secondes.
+     *
+     * La question est locale : a chaque instant, le membre a-t-il bouge
+     * pendant les trente dernieres secondes ? On compare donc sa position a
+     * celle qu'il occupait AU DEBUT d'une fenetre glissante, et non a une
+     * ancre lointaine.
+     *
+     * POURQUOI TRENTE SECONDES. Il faut que la fenetre soit assez longue pour
+     * qu'une allure lente y franchisse le seuil de bruit : a 0,6 m/s — une
+     * flanerie — il faut une trentaine de secondes pour parcourir les 16 m
+     * qui prouvent un deplacement sous 8 m de precision. Plus courte, la
+     * fenetre declarerait immobile un promeneur qui avance.
+     *
+     * CE QUE CELA COUTE. Les bords d'un arret : les quelques secondes qui
+     * l'entourent restent comptees comme du mouvement. Sur un feu rouge de
+     * trois minutes, l'erreur est de l'ordre de la fenetre — negligeable
+     * devant l'erreur inverse, qui comptait l'arret en entier.
+     *
+     * @param  list<GpsPoint>  $points
+     */
+    private function movingTime(array $points, float $minSegment): float
+    {
+        $fenetre = (float) config('cyclo.gps.stop_window_s', 30.0);
+
+        $total = 0.0;
+        $debut = 0;
+        $n = count($points);
+
+        for ($i = 1; $i < $n; $i++) {
+            $current = $points[$i];
+            $previous = $points[$i - 1];
+
+            // Une pause declaree n'est jamais du temps actif, et elle est
+            // deja comptee comme pause ailleurs.
+            if ($current->isPaused || $previous->isPaused) {
+                $debut = $i;
+
+                continue;
+            }
+
+            $dt = $current->secondsSince($previous);
+
+            if ($dt <= 0.0) {
+                continue;
+            }
+
+            // Le debut de la fenetre avance jusqu'a couvrir au plus
+            // `$fenetre` secondes. Pointeur monotone : le cout reste lineaire.
+            while ($debut < $i - 1 && $current->secondsSince($points[$debut]) > $fenetre) {
+                $debut++;
+            }
+
+            $reference = $points[$debut];
+            $ecart = Distance::between($reference, $current);
+            $seuil = max($minSegment, $this->uncertainty($reference, $current));
+
+            if ($ecart >= $seuil) {
+                $total += $dt;
+            }
+        }
+
+        return $total;
+    }
+
     /**
      * Incertitude combinee de deux points, en metres.
      *

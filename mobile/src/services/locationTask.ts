@@ -10,6 +10,7 @@ import {
   DEFAULT_THRESHOLDS,
   elevationGain,
   filterPoint,
+  haversine,
   isMoving,
   type GpsThresholds,
 } from '../lib/gps'
@@ -47,6 +48,51 @@ export function setActiveThresholds(sport: SportCode, thresholds?: GpsThresholds
 }
 
 /**
+ * Etat de mesure, CONSERVE ENTRE LES LOTS.
+ *
+ * Android ne livre pas les positions une par une mais par paquets, et le
+ * contexte de la tache est recree a chaque livraison. Tant que l'ancre etait
+ * une variable locale, elle repartait de zero a chaque lot : sur un paquet
+ * d'un seul point — le cas courant en mouvement — il n'y avait aucun point de
+ * reference, donc AUCUNE distance comptee. Les metres d'une marche
+ * disparaissaient purement et simplement.
+ *
+ * L'etat est indexe par sortie : changer de sortie repart proprement de zero,
+ * sans quoi la premiere mesure de la nouvelle serait prise depuis la derniere
+ * position de la precedente.
+ */
+type EtatMesure = {
+  uuid: string
+  anchor: {
+    lat: number
+    lng: number
+    altitude_m: number | null
+    accuracy_m: number | null
+    recorded_at: string
+  } | null
+  lastSpeed: number | null
+  /** Instant du franchissement en attente de confirmation. */
+  pendingSinceMs: number | null
+  /** Fenetre glissante du temps actif, independante de l'ancre. */
+  fenetre: Array<{ lat: number; lng: number; timestampMs: number; accuracyM: number | null }>
+}
+
+let etat: EtatMesure | null = null
+
+function etatPour(uuid: string): EtatMesure {
+  if (etat === null || etat.uuid !== uuid) {
+    etat = { uuid, anchor: null, lastSpeed: null, pendingSinceMs: null, fenetre: [] }
+  }
+
+  return etat
+}
+
+/** Remet l'etat a zero. Appele a l'ouverture d'une sortie et par les tests. */
+export function resetMeasurementState(): void {
+  etat = null
+}
+
+/**
  * Traite un lot de positions.
  *
  * Exporté pour être testable : la tâche elle-même ne peut pas être appelée
@@ -67,20 +113,14 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
 
   const isPaused = activity.status === 'PAUSED'
   let seq = activity.last_seq
-  /**
-   * Dernier point ayant produit un deplacement REEL.
-   *
-   * On ne garde que ce dont le calcul a besoin : mesurer depuis lui, et
-   * adapter le seuil a la precision qu'il annoncait.
+
+  /*
+   * L'etat de mesure survit au lot : voir `etatPour`. L'ancre est le dernier
+   * point ayant produit un deplacement REEL, et non le point precedent.
    */
-  let anchor: {
-    lat: number
-    lng: number
-    altitude_m: number | null
-    accuracy_m: number | null
-    recorded_at: string
-  } | null = null
-  let lastSpeed: number | null = null
+  const mesure = etatPour(activity.uuid)
+  let { anchor, lastSpeed, pendingSinceMs } = mesure
+  const fenetre = mesure.fenetre
 
   for (const location of locations) {
     await countRawPoint(activity.uuid)
@@ -142,23 +182,79 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
     )
 
     /*
-     * Deux raisons de ne rien compter, et de GARDER l'ancre.
+     * TROIS RAISONS DE NE RIEN COMPTER — ET DANS LES TROIS, L'ANCRE RESTE.
      *
-     * 1. Le deplacement est sous le seuil : c'est le tremblement du GPS.
+     * Ce dernier point est la correction : l'ancre AVANCAIT quand la lenteur
+     * tranchait, et les metres deja parcourus etaient perdus. Une marche
+     * ponctuee d'arrets perdait la moitie de sa distance — 96 m reels comptes
+     * 43 m — et une flanerie a 0,6 m/s n'etait jamais comptee, le seuil
+     * uniforme de 0,8 m/s etant deja une allure de marche.
      *
-     * 2. Il est trop LENT pour en etre un. Le seuil de distance seul ne
-     *    suffit pas : un recepteur immobile ne tremble pas au hasard, il
-     *    DERIVE lentement de plusieurs metres par minute. La derive finit
-     *    donc par franchir n'importe quel seuil, l'ancre suit, et le cycle
-     *    recommence — 50 m accumules en cinq minutes sur une table. La
-     *    vitesse tranche : 10 m en 60 s font 0,17 m/s, ce qui n'est ni
-     *    rouler ni marcher.
+     * 1. Sous le seuil : c'est le tremblement du GPS. On garde l'ancre, et
+     *    une marche lente finit par le franchir.
+     * 2. Pas encore CONFIRME : un deplacement reel s'eloigne de l'ancre et y
+     *    reste ; une derive franchit le seuil puis revient.
+     * 3. Trop LENT, au seuil du sport. Une derive n'atteint pas l'allure de
+     *    quelqu'un qui marche : 20 m en 4 minutes font 0,08 m/s.
      */
     const assezLoin = reference !== null && outcome.distanceM >= threshold
+
+    if (!assezLoin) {
+      // Un franchissement qui retombe etait un sursaut de derive.
+      pendingSinceMs = null
+    } else {
+      pendingSinceMs ??= candidate.timestampMs
+    }
+
+    const confirme =
+      assezLoin &&
+      pendingSinceMs !== null &&
+      candidate.timestampMs - pendingSinceMs >= CONFIRM_MOVE_MS
+
     const assezVite = isMoving(outcome.speedMps, thresholds)
 
-    const reelDeplacement = assezLoin && assezVite
-    const moving = !isPaused && reelDeplacement
+    const reelDeplacement = confirme && assezVite
+
+    if (reelDeplacement) {
+      pendingSinceMs = null
+    }
+
+    /*
+     * LE TEMPS ACTIF EST UNE AUTRE QUESTION.
+     *
+     * L'ancre de distance reste volontairement en place pendant un arret —
+     * c'est ce qui evite de perdre les metres deja parcourus — mais le temps
+     * ecoule depuis elle inclut alors l'arret entier. Un feu rouge de trois
+     * minutes entrait ainsi dans le temps de roulage.
+     *
+     * On compare donc a la position occupee TRENTE SECONDES plus tot, dans
+     * une fenetre independante de l'ancre.
+     */
+    fenetre.push({
+      lat: candidate.lat,
+      lng: candidate.lng,
+      timestampMs: candidate.timestampMs,
+      accuracyM: candidate.accuracyM,
+    })
+
+    while (
+      fenetre.length > 1 &&
+      candidate.timestampMs - (fenetre[1]?.timestampMs ?? 0) >= STOP_WINDOW_MS
+    ) {
+      fenetre.shift()
+    }
+
+    const debutFenetre = fenetre[0]
+    const enMouvement =
+      !isPaused &&
+      debutFenetre !== undefined &&
+      haversine(debutFenetre.lat, debutFenetre.lng, candidate.lat, candidate.lng) >=
+        Math.max(
+          thresholds.minSegmentM,
+          moyennePrecision(debutFenetre.accuracyM, candidate.accuracyM),
+        )
+
+    const moving = enMouvement
 
     await appendPoint(
       {
@@ -179,7 +275,7 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
         distanceM: isPaused || !reelDeplacement ? 0 : outcome.distanceM,
         movingMs: moving ? outcome.elapsedMs : 0,
         pausedMs: moving ? 0 : outcome.elapsedMs,
-        speedMps: moving ? outcome.speedMps : 0,
+        speedMps: reelDeplacement && !isPaused ? outcome.speedMps : 0,
         elevationGainM: isPaused
           ? 0
           : elevationGain(anchor?.altitude_m ?? null, candidate.altitudeM, thresholds),
@@ -197,15 +293,13 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
      */
     if (isPaused) {
       anchor = null
-    } else if (reelDeplacement || anchor === null || (assezLoin && !assezVite)) {
+      pendingSinceMs = null
+      fenetre.length = 0
+    } else if (reelDeplacement || anchor === null) {
       /*
-       * L'ancre avance sur un deplacement reel, mais AUSSI quand c'est la
-       * lenteur qui a tranche : une derive repartira de sa nouvelle position
-       * sans rien accumuler, et surtout un ARRET REEL suivi d'un depart ne
-       * verra pas son temps credite au premier segment parcouru.
-       *
-       * Le tremblement vif, lui, garde l'ancre : c'est le seuil de distance
-       * qui l'a rejete, et il faut continuer d'accumuler la preuve.
+       * L'ancre n'avance QUE sur un deplacement reel — ou au tout premier
+       * point. Dans tous les autres cas elle reste : les metres deja
+       * parcourus attendent au lieu d'etre perdus.
        */
       anchor = {
         lat: candidate.lat,
@@ -217,6 +311,11 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
       lastSpeed = outcome.speedMps
     }
   }
+
+  // On repose l'etat pour le lot suivant.
+  mesure.anchor = anchor
+  mesure.lastSpeed = lastSpeed
+  mesure.pendingSinceMs = pendingSinceMs
 }
 
 /*
@@ -322,6 +421,19 @@ export async function stopLocationUpdates(): Promise<void> {
  * Miroir de `cyclo.gps.accuracy_factor`.
  */
 const ACCURACY_FACTOR = 2.0
+
+/**
+ * Duree pendant laquelle un franchissement doit se maintenir avant d'etre
+ * compte. Miroir de `cyclo.gps.confirm_move_s`.
+ */
+const CONFIRM_MOVE_MS = 2_000
+
+/**
+ * Fenetre glissante du temps actif. Il en faut autant pour qu'une flanerie a
+ * 0,6 m/s franchisse les 16 m qui prouvent un deplacement sous 8 m de
+ * precision. Miroir de `cyclo.gps.stop_window_s`.
+ */
+const STOP_WINDOW_MS = 30_000
 
 /**
  * Incertitude combinee de deux points, en metres.

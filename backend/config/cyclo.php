@@ -69,6 +69,9 @@ return [
             'icon' => 'bike',
             'sample_interval_s' => 0.5,
             'min_distance_m' => 5,
+            // Sous 0,8 m/s on pousse son velo : ces metres comptent dans la
+            // distance, pas dans le temps actif.
+            'idle_speed_mps' => 0.8,
             'max_accuracy_m' => 25,
             'max_speed_mps' => 25.0,
             'uses_pace' => false,
@@ -79,6 +82,7 @@ return [
             'icon' => 'run',
             'sample_interval_s' => 0.5,
             'min_distance_m' => 3,
+            'idle_speed_mps' => 0.5,
             'max_accuracy_m' => 20,
             'max_speed_mps' => 12.0,
             'uses_pace' => true,
@@ -89,6 +93,8 @@ return [
             'icon' => 'hike',
             'sample_interval_s' => 0.5,
             'min_distance_m' => 3,
+            // Une randonnee en montee se fait a 0,4 m/s sans etre un arret.
+            'idle_speed_mps' => 0.3,
             'max_accuracy_m' => 30,
             'max_speed_mps' => 6.0,
             'uses_pace' => true,
@@ -119,6 +125,13 @@ return [
              | 8 m representent environ 7 s : la trace reste fidele.
              */
             'min_distance_m' => 8,
+            /*
+             | 0,3 m/s et non 0,8 : une flanerie, une promenade avec un
+             | enfant ou une marche en montee tiennent entre 0,4 et 0,8 m/s.
+             | Le seuil global les comptait comme des arrets, et le temps
+             | actif d'une promenade tombait a zero.
+             */
+            'idle_speed_mps' => 0.3,
             'max_accuracy_m' => 25,
             'max_speed_mps' => 3.5,
             'uses_pace' => true,
@@ -161,6 +174,28 @@ return [
         'accuracy_factor' => 2.0,
 
         'min_segment_m' => 1.0,
+
+        /*
+        | Duree pendant laquelle un franchissement de seuil doit se MAINTENIR
+        | avant d'etre compte, en secondes.
+        |
+        | Un deplacement reel s'eloigne de l'ancre et y reste ; une derive de
+        | recepteur franchit le seuil puis revient. Deux secondes suffisent a
+        | separer les deux, et ne coutent que les derniers metres d'une sortie
+        | qui s'arreterait pile sur un franchissement.
+        |
+        | Mesure sur le telephone pose de `WalkingDistanceTest` (oscillation
+        | de +/- 10 m atteignant 1,9 m/s) : sans confirmation, 54 m comptes a
+        | l'arret complet ; avec, zero.
+        */
+        'confirm_move_s' => 2.0,
+
+        /*
+        | Fenetre glissante du TEMPS ACTIF, en secondes. Voir
+        | `ActivityStatsCalculator::movingTime()` : elle doit etre assez
+        | longue pour qu'une flanerie y franchisse le seuil de bruit.
+        */
+        'stop_window_s' => 30.0,
         /*
         | Dénivelé — les deux réglages les plus délicats du projet.
         |

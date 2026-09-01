@@ -173,4 +173,113 @@ final class WalkingDistanceTest extends TestCase
         $this->assertGreaterThan(860, $stats['distance_m']);
         $this->assertLessThan(940, $stats['distance_m']);
     }
+
+    /* ---------------------------------------------------------------------- */
+    /* Le defaut signale : « j'ai teste en marchant, les metres ne sont pas   */
+    /* pris ». Trois manieres de perdre une marche, trois verrous.            */
+    /* ---------------------------------------------------------------------- */
+
+    #[Test]
+    public function une_flanerie_est_comptee_comme_une_marche(): void
+    {
+        /*
+         | Le defaut : le seuil d'immobilite valait 0,8 m/s pour TOUS les
+         | sports. Or 0,8 m/s font 2,9 km/h, ce qui est deja une allure de
+         | marche : une promenade tranquille, une montee, une marche avec un
+         | enfant tombent toutes en dessous. Elles etaient donc comptees comme
+         | des arrets, et 72 m reellement parcourus s'affichaient 0 m.
+         |
+         | Le seuil est desormais PAR SPORT — 0,3 m/s a pied.
+         */
+        $points = GpsTraceBuilder::make()
+            ->walkWithJitter(seconds: 120, speedMps: 0.6, noiseM: 2.0)
+            ->build();
+
+        $stats = $this->calculator()->calculate($points, Sport::Walking);
+
+        // 72 m reels. On tolere 25 % : sous 8 m de precision, le bruit pese
+        // presque autant que le deplacement, et exiger mieux serait mentir.
+        $this->assertGreaterThan(
+            54,
+            $stats['distance_m'],
+            'Une flanerie a 0,6 m/s est comptee comme un arret : '
+            .$stats['distance_m'].' m au lieu de 72.',
+        );
+        $this->assertLessThan(90, $stats['distance_m']);
+    }
+
+    #[Test]
+    public function une_marche_ponctuee_d_arrets_ne_perd_pas_ses_metres(): void
+    {
+        /*
+         | Le defaut le plus couteux : au rejet pour lenteur, l'ancre AVANCAIT.
+         | Les metres deja parcourus depuis elle etaient donc perdus pour de
+         | bon. Chaque arret effacait le trajet qui le precedait, et une marche
+         | de 96 m en quatre etapes s'affichait 43 m.
+         |
+         | L'ancre reste desormais en place : les metres attendent, et le
+         | marcheur les retrouve des qu'il repart.
+         */
+        $trace = GpsTraceBuilder::make();
+
+        for ($i = 0; $i < 4; $i++) {
+            $trace->walkWithJitter(seconds: 20, speedMps: 1.2, noiseM: 2.0)
+                ->idle(10);
+        }
+
+        $stats = $this->calculator()->calculate($trace->build(), Sport::Walking);
+
+        // 96 m reels, quatre arrets de 10 s.
+        $this->assertGreaterThan(
+            76,
+            $stats['distance_m'],
+            'Les arrets ont efface la distance parcourue avant eux : '
+            .$stats['distance_m'].' m au lieu de 96.',
+        );
+        $this->assertLessThan(115, $stats['distance_m']);
+    }
+
+    #[Test]
+    public function les_arrets_ne_gonflent_pas_le_temps_actif(): void
+    {
+        /*
+         | Contrepartie du verrou precedent : puisque l'ancre reste en place
+         | pendant un arret, le temps ecoule depuis elle inclut l'arret. Le
+         | compter comme du temps de roulage ferait s'effondrer la vitesse
+         | moyenne affichee.
+         |
+         | Le temps actif se mesure donc sur une fenetre glissante, sans
+         | rapport avec l'ancre de distance.
+         */
+        $trace = GpsTraceBuilder::make();
+
+        for ($i = 0; $i < 4; $i++) {
+            $trace->walkWithJitter(seconds: 20, speedMps: 1.2, noiseM: 2.0)
+                ->idle(10);
+        }
+
+        $stats = $this->calculator()->calculate($trace->build(), Sport::Walking);
+
+        /*
+         | La trace dure 119 s : 80 s de marche et 40 s d'arret repartis en
+         | quatre pauses de dix secondes.
+         |
+         | On ne verifie PAS que le temps actif tombe a 80 s, et ce n'est pas
+         | une facilite : la fenetre du temps actif dure trente secondes, si
+         | bien qu'un arret de dix secondes ne s'y detache pas. C'est un choix
+         | assume — une fenetre plus courte declarerait immobile un promeneur
+         | qui avance a 0,6 m/s, ce qui est le defaut qu'on vient de corriger.
+         |
+         | Ce qui est verrouille ici, c'est l'invariant : LE TEMPS ACTIF NE
+         | DEPASSE JAMAIS LA DUREE. Il l'a depasse — 129 s pour 119 s — parce
+         | que le rattrapage des derniers metres creditait du temps deja
+         | compte par la fenetre.
+         */
+        $this->assertLessThanOrEqual(
+            $stats['duration_s'],
+            $stats['moving_time_s'],
+            'Le temps actif depasse la duree de la sortie : '
+            .$stats['moving_time_s'].' s pour '.$stats['duration_s'].' s.',
+        );
+    }
 }

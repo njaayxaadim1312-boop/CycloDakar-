@@ -41,7 +41,7 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxAccuracyM: 20,
     maxSpeedMps: 12,
     maxAccelerationMps2: 5,
-    idleSpeedMps: 0.8,
+    idleSpeedMps: 0.5,
     minSegmentM: 3,
     elevationThresholdM: 10,
   },
@@ -49,22 +49,27 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxAccuracyM: 30,
     maxSpeedMps: 6,
     maxAccelerationMps2: 5,
-    idleSpeedMps: 0.8,
+    // Une randonnee en montee se fait a 0,4 m/s sans etre un arret.
+    idleSpeedMps: 0.3,
     minSegmentM: 3,
     elevationThresholdM: 10,
   },
   /*
    * La marche est le cas le plus exigeant du filtre : a 1,4 m/s, le bruit de
    * position pese autant que le deplacement reel. `minSegmentM` monte donc a
-   * 2 m et `idleSpeedMps` descend a 0,4 — sans quoi la trace se remplirait de
-   * zigzags qui gonfleraient la distance, et la pause automatique se
-   * declencherait sur un marcheur qui avance.
+   * position pese autant que le deplacement reel.
    */
   WALKING: {
     maxAccuracyM: 25,
     maxSpeedMps: 3.5,
     maxAccelerationMps2: 3,
-    idleSpeedMps: 0.4,
+    /*
+     * 0,3 m/s et non 0,8 : une flanerie, une promenade avec un enfant ou une
+     * marche en montee tiennent entre 0,4 et 0,8 m/s. Un seuil uniforme les
+     * comptait comme des arrets — 72 m reellement parcourus s'affichaient
+     * 0 m. Miroir de `cyclo.sports.WALKING.idle_speed_mps`.
+     */
+    idleSpeedMps: 0.3,
     /*
      * 8 m, et non 2 : c'est le seuil sous lequel un deplacement n'en est pas
      * un a pied. A 1,2 m/s, le marcheur avance moins vite que ne bouge

@@ -3,6 +3,7 @@ import {
   DEFAULT_THRESHOLDS,
   elevationGain,
   filterPoint,
+  haversine,
   isMoving,
   smoothSpeed,
   type Candidate,
@@ -50,6 +51,30 @@ import type { SportCode } from '@/types/api'
  * Miroir de `cyclo.gps.accuracy_factor`.
  */
 const ACCURACY_FACTOR = 2.0
+
+/**
+ * Durée pendant laquelle un franchissement de seuil doit se maintenir avant
+ * d'être compté.
+ *
+ * Un déplacement réel s'éloigne de l'ancre et y reste ; l'oscillation d'un
+ * récepteur posé franchit le seuil puis revient. Miroir de
+ * `cyclo.gps.confirm_move_s`.
+ */
+const CONFIRM_MOVE_MS = 2_000
+
+/**
+ * Fenêtre glissante du temps actif, en millisecondes.
+ *
+ * « Quelle distance ? » et « bougeait-il à cet instant ? » sont deux
+ * questions différentes. L'ancre de distance reste en place pendant un arrêt
+ * — c'est ce qui évite de perdre les mètres déjà parcourus — mais le temps
+ * écoulé depuis elle inclut alors l'arrêt tout entier.
+ *
+ * Trente secondes : il en faut autant pour qu'une flânerie à 0,6 m/s franchisse
+ * les 16 m qui prouvent un déplacement sous 8 m de précision. Miroir de
+ * `cyclo.gps.stop_window_s`.
+ */
+const STOP_WINDOW_MS = 30_000
 
 /**
  * Incertitude combinée de deux points, en mètres.
@@ -145,6 +170,25 @@ export class RecordingSession {
   private pausedMs = 0
   private pausedSinceMs: number | null = null
   private movingMs = 0
+
+  /** Instant du franchissement en attente de confirmation. */
+  private pendingSinceMs: number | null = null
+
+  /**
+   * Fenêtre glissante servant au TEMPS ACTIF, indépendante de l'ancre.
+   *
+   * Seules les trente dernières secondes y restent : la comparaison porte sur
+   * « où étais-je il y a trente secondes ? », pas sur une ancre qui peut
+   * dater d'un feu rouge.
+   */
+  private window: Array<{
+    lat: number
+    lng: number
+    timestampMs: number
+    accuracyM: number | null
+  }> = []
+
+  private lastTimestampMs: number | null = null
 
   private stats: LiveStats = { ...EMPTY_STATS }
 
@@ -263,6 +307,8 @@ export class RecordingSession {
 
     this.stats.lastRejection = null
 
+    this.accumulateMovingTime(candidate)
+
     /*
      * ANCRE — la correction du sur-comptage à la marche.
      *
@@ -281,54 +327,51 @@ export class RecordingSession {
     )
 
     /*
-     * Deux raisons de ne rien compter, et de GARDER l'ancre.
+     * TROIS RAISONS DE NE RIEN COMPTER — ET DANS LES TROIS, L'ANCRE RESTE.
      *
-     * 1. Le déplacement est sous le seuil : c'est le tremblement du GPS.
+     * Ce dernier point est la correction : l'ancre AVANÇAIT quand la lenteur
+     * tranchait, et les mètres déjà parcourus étaient perdus pour de bon. Une
+     * marche ponctuée d'arrêts perdait ainsi la moitié de sa distance — 96 m
+     * réels comptés 43 m — et une flânerie à 0,6 m/s n'était jamais comptée
+     * du tout, parce que le seuil uniforme de 0,8 m/s est déjà une allure de
+     * marche.
      *
-     * 2. Il est trop LENT pour en être un. Le seuil de distance seul ne
-     *    suffit pas : un récepteur immobile ne tremble pas au hasard, il
-     *    dérive lentement de plusieurs mètres par minute. La dérive finit
-     *    donc par franchir n'importe quel seuil de distance, l'ancre suit, et
-     *    le cycle recommence — 50 m accumulés en cinq minutes sur une table.
-     *    La vitesse tranche : 10 m en 60 s font 0,17 m/s, ce qui n'est ni
-     *    rouler ni marcher.
+     * 1. Le déplacement est sous le seuil : c'est le tremblement du GPS. On
+     *    garde l'ancre, et une marche lente finira par franchir le seuil.
+     *
+     * 2. Il n'est pas encore CONFIRMÉ. Un déplacement réel s'éloigne de
+     *    l'ancre et y reste ; une dérive de récepteur franchit le seuil puis
+     *    revient. Deux secondes séparent les deux.
+     *
+     * 3. Il est trop LENT, au seuil du sport. Une dérive n'atteint jamais
+     *    l'allure de quelqu'un qui marche : 20 m en 4 minutes font 0,08 m/s.
+     *    Ici non plus l'ancre ne bouge pas — les mètres attendent, et le
+     *    marcheur arrêté à un feu les retrouve dès qu'il repart.
      */
     const tooShort = outcome.distanceM < threshold
-    const tooSlow = !isMoving(outcome.speedMps, this.thresholds)
 
-    if (this.anchor !== null && (tooShort || tooSlow)) {
-      // Le point est tout de même transmis : il décrit où l'on était, la
-      // carte en a besoin, et le serveur refiltrera de toute façon.
+    if (this.anchor !== null && tooShort) {
+      // Un franchissement qui retombe sous le seuil était un sursaut de
+      // dérive, pas un départ : on l'oublie.
+      this.pendingSinceMs = null
       this.storePoint(candidate)
 
-      /*
-       * L'ancre AVANCE quand c'est la lenteur qui a tranché, et seulement
-       * dans ce cas.
-       *
-       * Une dérive repartira de sa nouvelle position sans jamais rien
-       * accumuler, puisqu'elle reste lente. Surtout, un ARRÊT RÉEL suivi
-       * d'un départ ne verra pas son temps crédité au premier segment
-       * parcouru — sans quoi un feu rouge de trois minutes compterait comme
-       * du temps actif.
-       *
-       * Le tremblement vif, lui, garde l'ancre : c'est le seuil de distance
-       * qui l'a rejeté, et il faut continuer d'accumuler la preuve d'un
-       * déplacement réel.
-       */
-      if (tooSlow && !tooShort) {
-        this.anchor = {
-          lat: candidate.lat,
-          lng: candidate.lng,
-          timestampMs: candidate.timestampMs,
-          altitudeM: candidate.altitudeM,
-          lastSpeedMps: 0,
-        }
-        this.anchorAccuracyM = candidate.accuracyM
-        this.smoothedSpeed = 0
-        this.stats.currentSpeedMps = 0
+      return true
+    }
+
+    if (this.anchor !== null) {
+      this.pendingSinceMs ??= candidate.timestampMs
+
+      const confirmed =
+        candidate.timestampMs - this.pendingSinceMs >= CONFIRM_MOVE_MS
+
+      if (!confirmed || !isMoving(outcome.speedMps, this.thresholds)) {
+        this.storePoint(candidate)
+
+        return true
       }
 
-      return true
+      this.pendingSinceMs = null
     }
 
     // La vitesse est lissée avant tout usage : la valeur brute d'un GPS
@@ -340,7 +383,6 @@ export class RecordingSession {
       // Tout ce qui parvient ici bouge réellement : la dérive et les arrêts
       // ont été écartés au-dessus.
       this.stats.distanceM += outcome.distanceM
-      this.movingMs += outcome.elapsedMs
 
       if (this.smoothedSpeed > this.stats.maxSpeedMps) {
         this.stats.maxSpeedMps = this.smoothedSpeed
@@ -415,6 +457,11 @@ export class RecordingSession {
       this.anchorAccuracyM = null
       this.smoothedSpeed = null
       this.stats.currentSpeedMps = 0
+      // La confirmation en cours et la fenêtre du temps actif portent sur
+      // l'avant-pause : les garder ferait compter le trajet de la pause.
+      this.pendingSinceMs = null
+      this.window = []
+      this.lastTimestampMs = null
     }
   }
 
@@ -429,6 +476,52 @@ export class RecordingSession {
     return this.pausedSinceMs !== null
   }
 
+  /**
+   * Accumule le TEMPS ACTIF sur une fenêtre glissante.
+   *
+   * La question est locale : à cet instant, le membre a-t-il bougé pendant
+   * les trente dernières secondes ? On compare donc sa position à celle qu'il
+   * occupait au début de la fenêtre, et non à l'ancre de distance — laquelle
+   * reste volontairement en place pendant un arrêt.
+   *
+   * Ce que cela coûte : les quelques secondes qui bordent un arrêt restent
+   * comptées. Négligeable devant l'erreur inverse, qui comptait l'arrêt
+   * entier comme du temps de roulage et effondrait la vitesse moyenne.
+   */
+  private accumulateMovingTime(candidate: Candidate): void {
+    const previousMs = this.lastTimestampMs
+    this.lastTimestampMs = candidate.timestampMs
+
+    this.window.push({
+      lat: candidate.lat,
+      lng: candidate.lng,
+      timestampMs: candidate.timestampMs,
+      accuracyM: candidate.accuracyM,
+    })
+
+    while (
+      this.window.length > 1 &&
+      candidate.timestampMs - (this.window[1]?.timestampMs ?? 0) >= STOP_WINDOW_MS
+    ) {
+      this.window.shift()
+    }
+
+    if (previousMs === null) return
+
+    const reference = this.window[0]
+    if (reference === undefined) return
+
+    const ecart = haversine(reference.lat, reference.lng, candidate.lat, candidate.lng)
+    const seuil = Math.max(
+      this.thresholds.minSegmentM,
+      averageAccuracy(reference.accuracyM, candidate.accuracyM),
+    )
+
+    if (ecart >= seuil) {
+      this.movingMs += candidate.timestampMs - previousMs
+    }
+  }
+
   /* ------------------------------------------------------------ lectures --- */
 
   /** Instantané des statistiques, recalculé à chaque tick d'horloge. */
@@ -437,7 +530,10 @@ export class RecordingSession {
     const paused = this.pausedMs + (this.pausedSinceMs !== null ? now - this.pausedSinceMs : 0)
 
     const durationS = Math.max(0, Math.round((now - this.startedAtMs - paused) / 1000))
-    const movingS = Math.round(this.movingMs / 1000)
+    // Pas de déplacement prouvé, pas de temps de déplacement : annoncer
+    // « 0 m en 9 s de mouvement » n'a aucun sens, et l'allure calculée
+    // là-dessus serait une aberration.
+    const movingS = this.stats.distanceM > 0 ? Math.round(this.movingMs / 1000) : 0
 
     return {
       ...this.stats,
