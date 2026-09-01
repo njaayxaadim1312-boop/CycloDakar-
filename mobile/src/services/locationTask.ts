@@ -67,7 +67,19 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
 
   const isPaused = activity.status === 'PAUSED'
   let seq = activity.last_seq
-  let previous = await getLastPoint(activity.uuid)
+  /**
+   * Dernier point ayant produit un deplacement REEL.
+   *
+   * On ne garde que ce dont le calcul a besoin : mesurer depuis lui, et
+   * adapter le seuil a la precision qu'il annoncait.
+   */
+  let anchor: {
+    lat: number
+    lng: number
+    altitude_m: number | null
+    accuracy_m: number | null
+    recorded_at: string
+  } | null = null
   let lastSpeed: number | null = null
 
   for (const location of locations) {
@@ -83,14 +95,23 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
       headingDeg: location.coords.heading ?? null,
     }
 
+    /*
+     * ANCRE — le point depuis lequel on mesure.
+     *
+     * Ce n'est PAS le point precedent, mais le dernier qui a produit un
+     * deplacement reel. De proche en proche, chaque tremblement du GPS etait
+     * mesure depuis le tremblement d'avant, et tous ceux qui depassaient le
+     * seuil s'additionnaient : 72 m parcourus a pied s'affichaient 135 m, et
+     * 90 s d'arret inventaient 209 m.
+     */
     const reference =
-      previous === null
+      anchor === null
         ? null
         : {
-            lat: previous.lat,
-            lng: previous.lng,
-            timestampMs: Date.parse(previous.recorded_at),
-            altitudeM: previous.altitude_m,
+            lat: anchor.lat,
+            lng: anchor.lng,
+            timestampMs: Date.parse(anchor.recorded_at),
+            altitudeM: anchor.altitude_m,
             lastSpeedMps: lastSpeed,
           }
 
@@ -111,7 +132,17 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
      * On l'enregistre quand même : sans lui, on ne saurait pas où le membre
      * s'est arrêté, et la carte montrerait un trou.
      */
-    const moving = !isPaused && isMoving(outcome.speedMps, thresholds)
+    /*
+     * Le seuil s'adapte a la precision annoncee : deux points donnes a
+     * plus ou moins 15 m ne prouvent pas un deplacement de 9 m.
+     */
+    const threshold = Math.max(
+      thresholds.minSegmentM,
+      moyennePrecision(anchor?.accuracy_m ?? null, candidate.accuracyM),
+    )
+
+    const reelDeplacement = reference !== null && outcome.distanceM >= threshold
+    const moving = !isPaused && reelDeplacement && isMoving(outcome.speedMps, thresholds)
 
     await appendPoint(
       {
@@ -127,29 +158,39 @@ export async function handleLocations(locations: Location.LocationObject[]): Pro
         is_paused: isPaused ? 1 : 0,
       },
       {
-        distanceM: isPaused || outcome.distanceM < thresholds.minSegmentM ? 0 : outcome.distanceM,
+        // Sous le seuil : le point est enregistre — la carte en a besoin —
+        // mais il n'ajoute AUCUNE distance, et l'ancre ne bouge pas.
+        distanceM: isPaused || !reelDeplacement ? 0 : outcome.distanceM,
         movingMs: moving ? outcome.elapsedMs : 0,
         pausedMs: moving ? 0 : outcome.elapsedMs,
         speedMps: moving ? outcome.speedMps : 0,
         elevationGainM: isPaused
           ? 0
-          : elevationGain(previous?.altitude_m ?? null, candidate.altitudeM, thresholds),
+          : elevationGain(anchor?.altitude_m ?? null, candidate.altitudeM, thresholds),
       },
     )
 
-    previous = {
-      activity_uuid: activity.uuid,
-      seq,
-      lat: candidate.lat,
-      lng: candidate.lng,
-      altitude_m: candidate.altitudeM,
-      speed_mps: candidate.speedMps,
-      accuracy_m: candidate.accuracyM,
-      heading_deg: candidate.headingDeg,
-      recorded_at: new Date(candidate.timestampMs).toISOString(),
-      is_paused: isPaused ? 1 : 0,
+    /*
+     * L'ancre n'avance QUE sur un deplacement reel. C'est toute la
+     * correction : la garder immobile empeche le bruit de s'accumuler, un
+     * tremblement apres l'autre.
+     *
+     * Une pause la remet a zero — le trajet parcouru pendant la pause, le
+     * membre peut rentrer en taxi, ne doit pas etre mesure d'un bloc a la
+     * reprise.
+     */
+    if (isPaused) {
+      anchor = null
+    } else if (reelDeplacement || anchor === null) {
+      anchor = {
+        lat: candidate.lat,
+        lng: candidate.lng,
+        altitude_m: candidate.altitudeM,
+        accuracy_m: candidate.accuracyM,
+        recorded_at: new Date(candidate.timestampMs).toISOString(),
+      }
+      lastSpeed = outcome.speedMps
     }
-    lastSpeed = outcome.speedMps
   }
 }
 
@@ -243,4 +284,19 @@ export async function stopLocationUpdates(): Promise<void> {
   if (await isTracking()) {
     await Location.stopLocationUpdatesAsync(LOCATION_TASK)
   }
+}
+
+/**
+ * Incertitude combinee de deux points, en metres.
+ *
+ * Deux points annonces a plus ou moins 10 m peuvent se trouver a 20 m l'un de
+ * l'autre sans que personne n'ait bouge. Un appareil qui n'annonce rien ne
+ * releve pas le seuil : on ne penalise pas un telephone discret.
+ */
+function moyennePrecision(a: number | null, b: number | null): number {
+  const valeurs = [a, b].filter((v): v is number => v !== null && v > 0)
+
+  if (valeurs.length === 0) return 0
+
+  return valeurs.reduce((somme, v) => somme + v, 0) / valeurs.length
 }

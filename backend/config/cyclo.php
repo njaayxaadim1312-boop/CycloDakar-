@@ -102,7 +102,19 @@ return [
             'label' => 'Marche',
             'icon' => 'walk',
             'sample_interval_s' => 3,
-            'min_distance_m' => 4,
+            /*
+             | 8 m, et non 4 : c'est le seuil sous lequel un deplacement n'en
+             | est pas un a pied. Mesure sur trace synthetique (72 m reels,
+             | 3 m de tremblement lateral) :
+             |
+             |   seuil  4 m -> 90 m mesures  (+25 %)
+             |   seuil  6 m -> 84 m          (+17 %)
+             |   seuil  8 m -> 69 m           (-4 %)
+             |
+             | Au-dela, on rognerait les virages d'une promenade. A 1,2 m/s,
+             | 8 m representent environ 7 s : la trace reste fidele.
+             */
+            'min_distance_m' => 8,
             'max_accuracy_m' => 25,
             'max_speed_mps' => 3.5,
             'uses_pace' => true,

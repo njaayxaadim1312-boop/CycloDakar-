@@ -36,7 +36,10 @@ final class ActivityStatsCalculator
             return $this->emptyStats(count($points) === 1 ? $points[0] : null);
         }
 
-        $movement = $this->measureMovement($points);
+        // Le sport decide du seuil sous lequel un deplacement n'en est pas
+        // un : six metres franchis en une seconde a velo, mais un metre
+        // vingt a pied.
+        $movement = $this->measureMovement($points, $sport);
         $elevation = $this->elevation->calculate($points);
 
         $first = $points[0];
@@ -102,9 +105,23 @@ final class ActivityStatsCalculator
      * @return array{distance_m: float, moving_time_s: float, max_speed_mps: float,
      *               splits: list<array<string, mixed>>, histogram: array<string, int>}
      */
-    private function measureMovement(array $points): array
+    private function measureMovement(array $points, Sport $sport): array
     {
-        $minSegment = (float) config('cyclo.gps.min_segment_m', 1.0);
+        /*
+         | Seuil de deplacement reel, PAR SPORT.
+         |
+         | Le seuil global de 1 m convenait au velo, ou une seconde franchit
+         | six metres. A la marche, il ne filtrait rien : a 1,2 m/s le membre
+         | avance moins vite que ne bouge l'incertitude de position, et chaque
+         | tremblement passait pour un deplacement. Mesure sur trace
+         | synthetique : 72 m reels comptes 135 m, et 209 m accumules a
+         | l'arret complet.
+         */
+        $minSegment = (float) config(
+            "cyclo.sports.{$sport->value}.min_distance_m",
+            config('cyclo.gps.min_segment_m', 1.0),
+        );
+
         $idleSpeed = (float) config('cyclo.gps.idle_speed_mps', 0.8);
 
         $distance = 0.0;
@@ -120,32 +137,76 @@ final class ActivityStatsCalculator
         $histogram = [];
 
         // Lissage de la vitesse : la vitesse maximale est prise sur la valeur
-        // LISSÉE, jamais sur une mesure isolée. Sans cela, un seul point
-        // aberrant fixerait un record personnel à 87 km/h.
+        // LISSEE, jamais sur une mesure isolee. Sans cela, un seul point
+        // aberrant fixerait un record personnel a 87 km/h.
         $smoothedSpeed = null;
 
+        /*
+         | ANCRE.
+         |
+         | On ne compare pas chaque point au precedent, mais au dernier point
+         | qui a produit un deplacement REEL. C'est toute la correction.
+         |
+         | Comparer de proche en proche laissait le bruit s'accumuler : chaque
+         | tremblement etait mesure depuis le tremblement d'avant, et tous
+         | ceux qui depassaient le seuil s'additionnaient. Avec une ancre
+         | fixe, un membre immobile reste a quelques metres de son ancre quoi
+         | qu'affiche le GPS, et rien ne s'accumule.
+         |
+         | Effet de bord bienvenu : la vitesse se calcule sur une base plus
+         | longue, donc bien plus stable.
+         */
+        $anchor = $points[0] ?? null;
+
+        if ($anchor === null) {
+            return [
+                'distance_m' => 0.0,
+                'moving_time_s' => 0.0,
+                'max_speed_mps' => 0.0,
+                'splits' => [],
+                'speed_histogram' => [],
+            ];
+        }
+
         for ($i = 1, $n = count($points); $i < $n; $i++) {
-            $previous = $points[$i - 1];
             $current = $points[$i];
 
-            $elapsed = $current->secondsSince($previous);
+            /*
+             | Une pause declaree remet l'ancre a zero.
+             |
+             | Sans cela, le trajet parcouru pendant la pause — le membre peut
+             | rentrer en taxi — serait mesure d'un seul bloc a la reprise et
+             | compte comme une distance parcourue.
+             */
+            if ($current->isPaused) {
+                $anchor = $current;
+
+                continue;
+            }
+
+            $elapsed = $current->secondsSince($anchor);
 
             if ($elapsed <= 0.0) {
                 continue;
             }
 
-            $segment = Distance::between($previous, $current);
+            $segment = Distance::between($anchor, $current);
 
-            // Segment sous le seuil : c'est le tremblement du GPS à l'arrêt,
-            // pas un déplacement. L'ignorer évite d'accumuler 300 m sur une
-            // pause d'un quart d'heure.
-            if ($segment < $minSegment) {
-                continue;
-            }
+            /*
+             | Sous le seuil : c'est le tremblement du GPS, pas un
+             | deplacement. On ignore le point ET ON GARDE L'ANCRE : c'est
+             | precisement en avancant l'ancre que l'ancienne version
+             | accumulait le bruit.
+             |
+             | Le seuil s'ADAPTE a la precision annoncee par l'appareil. Un
+             | point donne a plus ou moins 20 m ne prouve pas un deplacement
+             | de 9 m : exiger davantage quand le signal est mauvais evite de
+             | compter du bruit sous un ciel bouche, sans rien rogner quand
+             | la reception est bonne — le seuil du sport domine alors.
+             */
+            $seuil = max($minSegment, $this->uncertainty($anchor, $current));
 
-            // Une pause déclarée par l'utilisateur ne compte ni en distance
-            // ni en temps actif : il peut marcher, prendre un taxi, rentrer.
-            if ($current->isPaused || $previous->isPaused) {
+            if ($segment < $seuil) {
                 continue;
             }
 
@@ -153,13 +214,13 @@ final class ActivityStatsCalculator
 
             $smoothedSpeed = $smoothedSpeed === null
                 ? $speed
-                // Lissage exponentiel : réactif aux vraies accélérations,
-                // insensible à un point isolé.
+                // Lissage exponentiel : reactif aux vraies accelerations,
+                // insensible a un point isole.
                 : 0.7 * $smoothedSpeed + 0.3 * $speed;
 
             $distance += $segment;
 
-            // Le temps actif exclut les moments passés sous la vitesse de
+            // Le temps actif exclut les moments passes sous la vitesse de
             // marche lente : feux rouges, ravitaillements, photos.
             if ($speed >= $idleSpeed) {
                 $movingTime += $elapsed;
@@ -169,12 +230,12 @@ final class ActivityStatsCalculator
                 $histogram[$bucket] = ($histogram[$bucket] ?? 0) + 1;
             }
 
-            // Splits kilométriques.
+            // Splits kilometriques.
             $splitDistance += $segment;
             $splitTime += $elapsed;
 
             while ($splitDistance >= 1000.0) {
-                // Le segment peut franchir la borne du kilomètre : on
+                // Le segment peut franchir la borne du kilometre : on
                 // n'attribue au split que la part qui lui revient.
                 $overflow = $splitDistance - 1000.0;
                 $ratio = $segment > 0 ? ($segment - $overflow) / $segment : 1.0;
@@ -191,6 +252,9 @@ final class ActivityStatsCalculator
                 $splitDistance = $overflow;
                 $splitTime = $elapsed * (1 - $ratio);
             }
+
+            // Le deplacement est reel : l'ancre suit.
+            $anchor = $current;
         }
 
         return [
@@ -237,6 +301,31 @@ final class ActivityStatsCalculator
      * que le club ne demande pas — on ne renvoie rien plutôt qu'un chiffre
      * calculé sur un poids moyen inventé.
      */
+    /**
+     * Incertitude combinee de deux points, en metres.
+     *
+     * Deux points annonces a plus ou moins 10 m peuvent se trouver a 20 m
+     * l'un de l'autre sans que personne n'ait bouge. On prend donc la
+     * moyenne des deux precisions : c'est le deplacement minimal qui prouve
+     * quelque chose.
+     *
+     * Un point sans precision annoncee ne releve pas le seuil : on ne
+     * penalise pas un appareil discret.
+     */
+    private function uncertainty(GpsPoint $a, GpsPoint $b): float
+    {
+        $accuracies = array_filter(
+            [$a->accuracyM, $b->accuracyM],
+            static fn (?float $value): bool => $value !== null && $value > 0,
+        );
+
+        if ($accuracies === []) {
+            return 0.0;
+        }
+
+        return array_sum($accuracies) / count($accuracies);
+    }
+
     private function calories(Sport $sport, int $movingTimeS, ?float $weightKg): ?int
     {
         if ($weightKg === null || $movingTimeS <= 0) {

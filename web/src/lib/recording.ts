@@ -37,6 +37,21 @@ import type { SportCode } from '@/types/api'
  *    résultat qui fait foi.
  */
 
+/**
+ * Incertitude combinée de deux points, en mètres.
+ *
+ * Deux points annoncés à ±10 m peuvent se trouver à 20 m l'un de l'autre sans
+ * que personne n'ait bougé. Un appareil qui n'annonce rien ne relève pas le
+ * seuil : on ne pénalise pas un téléphone discret.
+ */
+function averageAccuracy(a: number | null, b: number | null): number {
+  const values = [a, b].filter((value): value is number => value !== null && value > 0)
+
+  if (values.length === 0) return 0
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
 /** Taille maximale d'un lot, imposée par l'API (`StorePointsRequest`). */
 const BATCH_SIZE = 500
 
@@ -102,7 +117,11 @@ export class RecordingSession {
   /** Dernière altitude retenue comme référence du dénivelé. */
   private altitudeReference: number | null = null
 
-  private reference: Reference | null = null
+  /** Dernier point ayant produit un déplacement réel. Voir `push()`. */
+  private anchor: Reference | null = null
+
+  /** Précision de l'ancre, pour adapter le seuil au signal. */
+  private anchorAccuracyM: number | null = null
   private smoothedSpeed: number | null = null
   private seq = 0
   private syncedUpTo = 0
@@ -219,7 +238,7 @@ export class RecordingSession {
 
     this.stats.accuracyM = candidate.accuracyM
 
-    const outcome = filterPoint(candidate, this.reference, this.thresholds)
+    const outcome = filterPoint(candidate, this.anchor, this.thresholds)
 
     if (!outcome.accepted) {
       this.stats.pointsRejected++
@@ -230,12 +249,37 @@ export class RecordingSession {
 
     this.stats.lastRejection = null
 
+    /*
+     * ANCRE — la correction du sur-comptage à la marche.
+     *
+     * On ne mesure pas depuis le point précédent, mais depuis le dernier
+     * point qui a produit un déplacement RÉEL. De proche en proche, chaque
+     * tremblement du GPS était mesuré depuis le tremblement d'avant, et tous
+     * ceux qui dépassaient le seuil s'additionnaient : 72 m parcourus à pied
+     * s'affichaient 135 m, et 90 s d'arrêt inventaient 209 m.
+     *
+     * Le seuil s'adapte à la précision annoncée par l'appareil : deux points
+     * donnés à ±15 m ne prouvent pas un déplacement de 9 m.
+     */
+    const threshold = Math.max(
+      this.thresholds.minSegmentM,
+      averageAccuracy(this.anchorAccuracyM, candidate.accuracyM),
+    )
+
+    if (this.anchor !== null && outcome.distanceM < threshold) {
+      // Sous le seuil : on garde l'ancre. Le point est tout de même transmis
+      // au serveur — il décrit où l'on était, et le serveur refiltrera.
+      this.storePoint(candidate)
+
+      return true
+    }
+
     // La vitesse est lissée avant tout usage : la valeur brute d'un GPS
     // saute de plusieurs km/h d'une seconde à l'autre, et un compteur qui
     // clignote est illisible au guidon.
     this.smoothedSpeed = smoothSpeed(this.smoothedSpeed, outcome.speedMps)
 
-    if (this.reference !== null) {
+    if (this.anchor !== null) {
       this.stats.distanceM += outcome.distanceM
 
       if (isMoving(this.smoothedSpeed, this.thresholds)) {
@@ -265,14 +309,30 @@ export class RecordingSession {
       }
     }
 
-    this.reference = {
+    // Le déplacement est réel : l'ancre suit.
+    this.anchor = {
       lat: candidate.lat,
       lng: candidate.lng,
       timestampMs: candidate.timestampMs,
       altitudeM: candidate.altitudeM,
       lastSpeedMps: this.smoothedSpeed,
     }
+    this.anchorAccuracyM = candidate.accuracyM
 
+    this.storePoint(candidate)
+    this.stats.currentSpeedMps = this.smoothedSpeed
+
+    return true
+  }
+
+  /**
+   * Enregistre un point retenu par le filtre.
+   *
+   * Appelé même quand le déplacement est sous le seuil : le point décrit où
+   * l'on se trouvait, la carte en a besoin, et le serveur refiltrera de toute
+   * façon. Seul le CUMUL de distance distingue les deux cas.
+   */
+  private storePoint(candidate: Candidate): void {
     this.points.push({
       seq: this.seq++,
       lat: Number(candidate.lat.toFixed(7)),
@@ -286,9 +346,6 @@ export class RecordingSession {
 
     this.trace.push({ lat: candidate.lat, lng: candidate.lng })
     this.stats.pointsKept = this.points.length
-    this.stats.currentSpeedMps = this.smoothedSpeed
-
-    return true
   }
 
   /* --------------------------------------------------------------- pause --- */
@@ -296,9 +353,10 @@ export class RecordingSession {
   pause(): void {
     if (this.pausedSinceMs === null) {
       this.pausedSinceMs = Date.now()
-      // On oublie la référence : à la reprise, le segment franchi pendant la
+      // On oublie l'ancre : à la reprise, le segment franchi pendant la
       // pause ne doit pas être compté comme une distance parcourue.
-      this.reference = null
+      this.anchor = null
+      this.anchorAccuracyM = null
       this.smoothedSpeed = null
       this.stats.currentSpeedMps = 0
     }

@@ -75,7 +75,14 @@ export const DEFAULT_THRESHOLDS: Record<SportCode, GpsThresholds> = {
     maxSpeedMps: 3.5,
     maxAccelerationMps2: 3,
     idleSpeedMps: 0.4,
-    minSegmentM: 2,
+    /*
+     * 8 m, et non 2 : c'est le seuil sous lequel un deplacement n'en est pas
+     * un a pied. A 1,2 m/s, le marcheur avance moins vite que ne bouge
+     * l'incertitude de position. Mesure sur trace synthetique (72 m reels,
+     * 3 m de tremblement lateral) : seuil 2 m -> 135 m mesures, seuil 8 m ->
+     * 69 m. Aligne sur `cyclo.sports.WALKING.min_distance_m`.
+     */
+    minSegmentM: 8,
     elevationThresholdM: 10,
   },
 }

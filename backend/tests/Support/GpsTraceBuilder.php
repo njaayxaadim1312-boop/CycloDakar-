@@ -197,6 +197,46 @@ final class GpsTraceBuilder
         return $this;
     }
 
+    /**
+     * Une marche lente, avec le tremblement lateral reel d'un GPS.
+     *
+     * C'est le cas le plus exigeant du filtre, et celui qui a revele le bug
+     * de la phase 15bis : a 1,2 m/s, le membre avance moins vite que ne bouge
+     * l'incertitude de position. Chaque point tombe a quelques metres de
+     * cote, et un calcul naif additionne ce bruit comme du deplacement.
+     *
+     * L'oscillation est deterministe : un test doit donner le meme resultat
+     * a chaque execution.
+     *
+     * @param  int  $seconds  duree de la marche
+     * @param  float  $speedMps  vitesse reelle, en m/s
+     * @param  float  $noiseM  amplitude du tremblement lateral, en metres
+     */
+    public function walkWithJitter(
+        int $seconds,
+        float $speedMps = 1.2,
+        float $noiseM = 3.0,
+    ): self {
+        $baseLng = $this->lng;
+
+        for ($t = 0; $t < $seconds; $t++) {
+            $this->lat += $speedMps / self::METERS_PER_DEGREE_LAT;
+
+            // Le bruit porte sur la LONGITUDE : perpendiculaire a la marche,
+            // il n'ajoute aucune distance reelle. Tout metre compte en plus
+            // est donc, a coup sur, une erreur.
+            $lngMeters = (sin($t * 2.3) + sin($t * 0.77)) * ($noiseM / 2);
+            $this->lng = $baseLng + $lngMeters / (self::METERS_PER_DEGREE_LAT * cos(deg2rad($this->lat)));
+
+            $this->clock = $this->clock->addSecond();
+            $this->push(4.0);
+        }
+
+        $this->lng = $baseLng;
+
+        return $this;
+    }
+
     /** Répète les N derniers points à l'identique (rejeu d'un lot). */
     public function duplicateLast(int $count): self
     {

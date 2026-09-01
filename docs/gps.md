@@ -226,3 +226,69 @@ résultat qui fait foi, conformément à la règle « le client n'est jamais cru
 Le titre se pose **après** la finalisation, par un `PATCH` : la finalisation
 fige la trace et recalcule les statistiques, l'y glisser ferait passer un champ
 d'affichage pour une donnée de mesure.
+
+## Le sur-comptage à la marche — corrigé
+
+Signalé par le club : « en marchant doucement, la vitesse exagère, et moins de
+6 m me sont comptés 20 m ».
+
+### La cause
+
+Deux défauts se combinaient.
+
+**1. La référence avançait à chaque point.** La distance se mesurait de proche
+en proche : point 1 → point 2, point 2 → point 3… Chaque tremblement du GPS
+était donc mesuré *depuis le tremblement précédent*, et tous ceux qui
+dépassaient le seuil s'additionnaient.
+
+**2. Le seuil ne tenait pas compte du sport.** Un mètre convient au vélo, où
+une seconde franchit six mètres. À 1,2 m/s, **le marcheur avance moins vite que
+ne bouge l'incertitude de position** : le seuil ne filtrait plus rien.
+
+Mesuré sur trace synthétique — 60 s à 1,2 m/s, soit 72 m réels, avec 3 m de
+tremblement **latéral** (perpendiculaire à la marche : il n'ajoute aucune
+distance réelle, donc tout mètre en plus est à coup sûr une erreur) :
+
+| | Distance | Vitesse moyenne | 90 s immobile |
+|---|---|---|---|
+| Avant | **135 m** (+87 %) | 2,29 m/s — 8,2 km/h | **209 m** de pur bruit |
+| Après | **69 m** (−4 %) | 1,25 m/s — 4,5 km/h | **0 m** |
+
+### La correction — le point d'ancrage
+
+On ne mesure plus depuis le point précédent, mais depuis **le dernier point qui
+a produit un déplacement réel**. Sous le seuil, le point est enregistré — la
+carte en a besoin — mais l'ancre **ne bouge pas**. Un membre immobile reste
+donc à quelques mètres de son ancre quoi qu'affiche le GPS, et rien ne
+s'accumule.
+
+Effet de bord bienvenu : la vitesse se calcule sur une base plus longue, donc
+bien plus stable.
+
+Le seuil est désormais **par sport** (`cyclo.sports.*.min_distance_m`) :
+
+| Sport | Seuil | Pourquoi |
+|---|---|---|
+| Cyclisme | 5 m | une seconde à 6 m/s en franchit six |
+| Course | 3 m | une seconde à 3 m/s en franchit trois |
+| Randonnée | 3 m | allure lente mais terrain accidenté |
+| **Marche** | **8 m** | mesuré : 4 m → 90 m, 6 m → 84 m, 8 m → 69 m |
+
+Au-delà de 8 m on rognerait les virages d'une promenade. À 1,2 m/s, 8 m
+représentent environ 7 s : la trace reste fidèle.
+
+Le seuil **s'adapte enfin à la précision annoncée** par l'appareil : deux points
+donnés à ±15 m ne prouvent pas un déplacement de 9 m. Sous bon signal, le seuil
+du sport domine et rien n'est rogné.
+
+### Les trois étages corrigés ensemble
+
+Le serveur, le web et le mobile appliquent la **même** règle. Un affichage en
+direct qui divergerait du calcul final ferait douter du chiffre le plus
+important de l'application.
+
+| Étage | Vérification |
+|---|---|
+| `ActivityStatsCalculator` | 6 tests PHP, dont vélo et course inchangés |
+| `RecordingSession` (web) | 6 assertions — mêmes chiffres que le serveur, 69 m et 0 m |
+| `locationTask` (mobile) | même ancre, même seuil adaptatif |
