@@ -61,6 +61,19 @@ interface TrackingState {
   refresh: () => Promise<void>
 }
 
+/**
+ * Cadence de capture GPS, en secondes.
+ *
+ * Miroir de `cyclo.sports.*.sample_interval_s`. A 0,5 s, la trace est deux
+ * fois plus fine qu'a 1 Hz : les virages serres et les demarrages se voient
+ * mieux sur la carte et dans la video du parcours.
+ *
+ * Ce n'est pas gratuit : deux fois plus de points a stocker, a transmettre et
+ * a filtrer, et une consommation de batterie sensiblement plus forte sur une
+ * sortie longue.
+ */
+const SAMPLE_INTERVAL_S = 0.5
+
 export const useTracking = create<TrackingState>((set, get) => ({
   activity: null,
   permission: 'unknown',
@@ -131,7 +144,11 @@ export const useTracking = create<TrackingState>((set, get) => ({
 
       await startLocationUpdates(
         activity.sport as SportCode,
-        activity.sport === 'HIKING' ? 3 : 1,
+        // 0,5 s pour tous les sports : le club a demande une trace deux fois
+        // plus fine. Le cout est reel — batterie et volume de donnees — mais
+        // il est assume, et le filtre ecarte de toute facon le bruit
+        // supplementaire que cette cadence apporte.
+        SAMPLE_INTERVAL_S,
         config.minSegmentM * 3,
       )
     }

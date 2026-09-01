@@ -18,6 +18,29 @@ import {
 import { SPORTS, SPORT_COLOR, SPORT_ICON, SPORT_LABEL, sportTint } from '@/lib/sports'
 import type { SportCode } from '@/types/api'
 
+/**
+ * Cadence de rafraîchissement de l'affichage, en millisecondes.
+ *
+ * Deux fois par seconde : la durée avance sans à-coup et la vitesse suit le
+ * geste. Ce n'est PAS la cadence du GPS — le navigateur livre une position
+ * quand il en a une, on ne la commande pas.
+ */
+const DISPLAY_INTERVAL_MS = 500
+
+/**
+ * Cadence d'envoi des points au serveur, en millisecondes.
+ *
+ * Volontairement bien plus lente que l'affichage : envoyer toutes les demi-
+ * secondes ferait 7 200 requêtes sur une sortie de deux heures, viderait la
+ * batterie et le forfait, et n'apporterait rien — les points sont numérotés
+ * et l'envoi est reprenable, donc rien ne se perd entre deux lots.
+ *
+ * 10 s est le compromis : au pire, une fermeture brutale du navigateur coûte
+ * dix secondes de trace, que le serveur signalera comme manquantes à la
+ * finalisation.
+ */
+const UPLOAD_INTERVAL_MS = 10_000
+
 type Phase = 'choix' | 'demarrage' | 'course' | 'fin'
 
 /** Motifs de rejet, expliqués au membre plutôt qu'affichés en code. */
@@ -79,13 +102,21 @@ export function RecordPage() {
   useEffect(() => {
     if (phase !== 'course') return
 
+    /*
+     * Rafraichissement toutes les 500 ms.
+     *
+     * Le navigateur livre une position quand il en a une — on ne commande
+     * pas sa cadence. Mais l'affichage, lui, se recalcule deux fois par
+     * seconde : la duree avance sans a-coup, et la vitesse suit le geste au
+     * lieu de sembler en retard d'une seconde.
+     */
     const timer = window.setInterval(() => {
       const current = session.current
 
       if (current !== null) {
         setStats(current.snapshot())
       }
-    }, 1000)
+    }, DISPLAY_INTERVAL_MS)
 
     return () => window.clearInterval(timer)
   }, [phase])
@@ -95,12 +126,9 @@ export function RecordPage() {
   useEffect(() => {
     if (phase !== 'course') return
 
-    // Toutes les 30 s : assez souvent pour ne rien perdre si le navigateur
-    // est fermé brutalement, assez rare pour ne pas peser sur une connexion
-    // mobile pendant trois heures.
     const timer = window.setInterval(() => {
       void session.current?.flush().catch(() => undefined)
-    }, 30_000)
+    }, UPLOAD_INTERVAL_MS)
 
     return () => window.clearInterval(timer)
   }, [phase])

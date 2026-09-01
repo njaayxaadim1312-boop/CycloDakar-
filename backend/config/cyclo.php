@@ -53,7 +53,11 @@ return [
     | Sports supportés. La clé est la valeur stockée en base ; l'ajout d'un
     | sport ne demande aucune migration.
     |
-    | - sample_interval_s : cadence de capture GPS visée
+    | - sample_interval_s : cadence de capture GPS visée, en SECONDES.
+    |   Une valeur decimale est admise : 0,5 s donne une trace deux fois plus
+    |   fine, au prix d'une consommation de batterie sensiblement plus forte
+    |   et d'une trace deux fois plus lourde a transmettre. Le club a demande
+    |   cette finesse ; elle se regle ici, sport par sport.
     | - min_distance_m    : déplacement minimal avant d'enregistrer un point
     | - max_accuracy_m    : au-delà, le point est rejeté (filtre n°2)
     | - max_speed_mps     : au-delà, c'est un saut GPS (filtre n°5)
@@ -63,7 +67,7 @@ return [
         'CYCLING' => [
             'label' => 'Cyclisme',
             'icon' => 'bike',
-            'sample_interval_s' => 1,
+            'sample_interval_s' => 0.5,
             'min_distance_m' => 5,
             'max_accuracy_m' => 25,
             'max_speed_mps' => 25.0,
@@ -73,7 +77,7 @@ return [
         'RUNNING' => [
             'label' => 'Course',
             'icon' => 'run',
-            'sample_interval_s' => 1,
+            'sample_interval_s' => 0.5,
             'min_distance_m' => 3,
             'max_accuracy_m' => 20,
             'max_speed_mps' => 12.0,
@@ -83,7 +87,7 @@ return [
         'HIKING' => [
             'label' => 'Randonnée',
             'icon' => 'hike',
-            'sample_interval_s' => 3,
+            'sample_interval_s' => 0.5,
             'min_distance_m' => 3,
             'max_accuracy_m' => 30,
             'max_speed_mps' => 6.0,
@@ -101,7 +105,7 @@ return [
         'WALKING' => [
             'label' => 'Marche',
             'icon' => 'walk',
-            'sample_interval_s' => 3,
+            'sample_interval_s' => 0.5,
             /*
              | 8 m, et non 4 : c'est le seuil sous lequel un deplacement n'en
              | est pas un a pied. Mesure sur trace synthetique (72 m reels,
