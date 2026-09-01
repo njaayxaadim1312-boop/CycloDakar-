@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\EventParticipationController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\ParticipationController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
@@ -210,6 +211,45 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             // Pointage : reserve aux collecteurs et au-dessus (EventPolicy).
             Route::post('/{event}/attendance', [EventParticipationController::class, 'attendance'])
                 ->name('attendance');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Participations — PHASE 10
+        |----------------------------------------------------------------------
+        |
+        | Campagnes de collecte. Reserve aux collecteurs et au-dessus ; creer
+        | et modifier demande le role de tresorier (ParticipationPolicy). Un
+        | membre verra SA dette dans son espace personnel — PHASE 12.
+        |
+        | Tous les montants sont des ENTIERS de FCFA, a l'entree comme a la
+        | sortie. Aucun flottant ne touche l'argent (docs/finance.md, I5).
+        |
+        */
+        Route::prefix('participations')->name('participations.')->group(function (): void {
+            // Ce qu'un collecteur doit aller chercher sur le terrain, toutes
+            // collectes confondues. Declaree AVANT /{participation} pour que
+            // « mine » ne soit pas pris pour un uuid.
+            Route::get('/mine', [ParticipationController::class, 'myAssignments'])
+                ->name('mine');
+
+            Route::get('/', [ParticipationController::class, 'index'])->name('index');
+            Route::post('/', [ParticipationController::class, 'store'])->name('store');
+
+            Route::get('/{participation}', [ParticipationController::class, 'show'])->name('show');
+            Route::patch('/{participation}', [ParticipationController::class, 'update'])->name('update');
+            Route::patch('/{participation}/status', [ParticipationController::class, 'updateStatus'])
+                ->name('status');
+            Route::delete('/{participation}', [ParticipationController::class, 'destroy'])
+                ->name('destroy');
+
+            // Affectation des membres. Sans liste : tous les membres actifs.
+            Route::post('/{participation}/members', [ParticipationController::class, 'assign'])
+                ->name('assign');
+            Route::patch('/{participation}/members/{line}', [ParticipationController::class, 'updateLine'])
+                ->name('lines.update');
+            Route::delete('/{participation}/members/{line}', [ParticipationController::class, 'removeLine'])
+                ->name('lines.destroy');
         });
 
         /*

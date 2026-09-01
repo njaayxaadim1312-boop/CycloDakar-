@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\ActivityStatus;
 use App\Enums\EventStatus;
+use App\Enums\ParticipationMemberStatus;
+use App\Enums\ParticipationStatus;
 use App\Enums\RegistrationStatus;
 use App\Enums\MemberStatus;
 use App\Enums\UserRole;
@@ -14,6 +16,8 @@ use App\Models\Activity;
 use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\Member;
+use App\Models\Participation;
+use App\Models\ParticipationMember;
 use App\Services\Gps\PersonalStatsService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -75,9 +79,11 @@ final class StatsController extends Controller
             // Les événements sont mesurables depuis la phase 9.
             'events' => $this->eventStats($request),
 
+            // Les collectes sont mesurables depuis la phase 10.
+            'participations' => $this->participationStats($request),
+
             // Modules à venir. `available: false` et non 0 : voir le
             // commentaire de classe.
-            'participations' => $this->pending(10),
             'finance' => $this->financeStats($request),
 
             'generated_at' => now()->toIso8601String(),
@@ -159,6 +165,51 @@ final class StatsController extends Controller
                 'starts_at' => $nextEvent->starts_at?->toIso8601String(),
                 'location_name' => $nextEvent->location_name,
             ],
+        ];
+    }
+
+    /**
+     * Reste à collecter.
+     *
+     * Réservé aux collecteurs et au-dessus : un membre n'a pas à voir la
+     * trésorerie du club depuis son tableau de bord. Sous ce rôle, le bloc
+     * répond `visible: false` — et non un zéro, qui laisserait croire que le
+     * club n'attend rien.
+     *
+     * @return array<string, mixed>
+     */
+    private function participationStats(Request $request): array
+    {
+        if (! $request->user()->role->canCollect()) {
+            return ['visible' => false];
+        }
+
+        $row = ParticipationMember::query()
+            ->where('status', '!=', ParticipationMemberStatus::Cancelled)
+            ->whereHas('participation', fn ($q) => $q->where('status', ParticipationStatus::Open))
+            // `lines` est un mot réservé de MariaDB : l'alias doit être
+            // autre chose, sans quoi la requête ne se prépare même pas.
+            ->selectRaw('
+                COUNT(*) as line_count,
+                COALESCE(SUM(expected_amount), 0) as expected,
+                COALESCE(SUM(paid_amount), 0) as collected
+            ')
+            ->first();
+
+        $expected = (int) ($row->expected ?? 0);
+        $collected = (int) ($row->collected ?? 0);
+
+        return [
+            'available' => true,
+            'visible' => true,
+            'open_campaigns' => Participation::query()
+                ->where('status', ParticipationStatus::Open)
+                ->count(),
+            // Entiers de FCFA, comme partout où il est question d'argent.
+            'expected_amount' => $expected,
+            'collected_amount' => $collected,
+            'remaining_amount' => max(0, $expected - $collected),
+            'lines' => (int) ($row->line_count ?? 0),
         ];
     }
 
