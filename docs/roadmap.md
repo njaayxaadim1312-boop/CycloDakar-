@@ -364,10 +364,66 @@ Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 
 ---
 
-## ⏳ Phase 10 — Participations
+## ✅ Phase 10 — Participations *(terminée)*
 
-Campagnes de collecte, montant attendu, date limite, affectation des membres,
-affectation d'un collecteur, suivi attendu / encaissé / reste.
+**Backend**
+
+- Tables `participations` et `participation_members`. Dix routes : liste, fiche
+  avec suivi, création, modification, changement d'état, suppression,
+  affectation des membres, modification et retrait d'une ligne, et
+  « ce que je dois aller chercher » pour un collecteur.
+
+Quatre invariants comptables, chacun testé :
+
+1. **L'argent est en entiers de FCFA.** `5000.5` est refusé avec un message
+   explicite, pas arrondi en silence. Un arrondi invisible sur de l'argent est
+   pire qu'un refus.
+2. **`paid_amount` et `status` sont dérivés**, jamais reçus du client. Les
+   accepter laisserait quiconque se déclarer à jour de cotisation. Un test
+   envoie explicitement ces champs et vérifie qu'ils sont ignorés.
+3. **Le montant est figé à l'affectation.** Relever le tarif ne réécrit pas
+   les dettes déjà créées : sinon un versement de 5 000 apparaîtrait partiel
+   sur une dette rétroactivement portée à 7 500.
+4. **On ne supprime pas ce qui a reçu de l'argent.** Une ligne payée est
+   ANNULÉE ; une collecte ayant reçu des paiements refuse d'être supprimée.
+   Supprimer laisserait des paiements orphelins.
+
+Autres décisions :
+
+- Sans liste, l'affectation prend **tous les membres actifs** — le geste réel
+  d'une cotisation annuelle. Opération idempotente.
+- Les lignes annulées sortent du montant attendu : un membre dispensé ne doit
+  pas gonfler ce que le club croit avoir à recevoir.
+- Créer et modifier demande le rôle de **trésorier** ; un collecteur encaisse,
+  il ne décide pas de ce que le club demande à ses membres.
+- Les transitions ont leur propre droit, plus permissif qu'`update` : sans
+  cela, rouvrir une collecte close renvoyait 403 quand rouvrir une annulée
+  renvoyait 422, pour une même cause.
+
+**Web**
+
+- Liste des collectes avec les trois chiffres et une barre de progression.
+- Fiche : suivi, actes sur la campagne, liste nominative des dettes (impayés
+  en tête — c'est ce qu'un collecteur vient chercher).
+- Formulaire : montant saisi en francs, entier, **sans conversion**. Un aperçu
+  mis en forme (« 5 000 FCFA ») lève l'ambiguïté d'un « 5000 » tapé à la volée.
+- Tableau de bord : « Reste à collecter » porte de vrais montants, et
+  disparaît complètement sous le rôle de collecteur.
+
+**Vérifié**
+
+- Backend : **294 tests / 880 assertions** sur MySQL (29 nouveaux).
+- Web : `tsc -b` et build propres ; rendu headless de `/participations`,
+  `/participations/:uuid` et du tableau de bord, en trésorier et en collecteur.
+
+**Reporté**
+
+- Les **encaissements** → phase 12. `paid_amount` vaut donc zéro partout, et
+  c'est la vérité : le module n'est pas livré. On ne simule aucun montant.
+  `ParticipationMember::recalculate()` existe déjà pour que le statut n'ait,
+  dès le premier jour, qu'un seul chemin d'écriture.
+- La vue « ma dette » côté membre → phase 12, avec les paiements.
+- Les relances avant échéance → phase 17.
 
 ---
 

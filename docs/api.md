@@ -250,6 +250,122 @@ le geste à faire quand on perd son téléphone.
 Le mot de passe actuel est exigé même si la session est valide : un téléphone laissé
 déverrouillé ne doit pas suffire à verrouiller le compte de son propriétaire.
 
+## Participations — phase 10
+
+Campagnes de collecte. **Réservé aux collecteurs et au-dessus** ; créer et
+modifier demande le rôle de trésorier. Un membre verra SA dette dans son espace
+personnel — phase 12.
+
+**Tous les montants sont des entiers de FCFA**, à l'entrée comme à la sortie.
+Un décimal est **refusé**, jamais arrondi : un arrondi invisible sur de
+l'argent est pire qu'un refus.
+
+### `GET /participations`
+
+| Paramètre | Valeurs | Défaut |
+|---|---|---|
+| `scope` | `open` · `all` | `open` |
+| `status` | `DRAFT` · `OPEN` · `CLOSED` · `CANCELLED` | — |
+
+Par défaut, ce qui demande une action : les collectes closes n'appellent plus
+rien et encombreraient la liste. Les brouillons ne sortent que pour leur auteur
+et l'administration.
+
+### `GET /participations/{uuid}`
+
+```json
+{
+  "data": {
+    "name": "Sortie Lac Rose",
+    "status": "OPEN", "status_label": "Ouverte",
+    "expected_amount": 5000,
+    "due_on": "2026-09-20", "is_overdue": false,
+    "tally": {
+      "expected_amount": 15000, "collected_amount": 7000,
+      "remaining_amount": 8000, "members": 3, "paid_members": 1,
+      "progress_percent": 46.7
+    },
+    "lines": [{
+      "id": 1,
+      "member": { "matricule": "CD-000042", "full_name": "…", "phone_formatted": "…" },
+      "expected_amount": 5000, "paid_amount": 0, "remaining_amount": 5000,
+      "status": "NON_PAYE", "status_label": "Non payé"
+    }]
+  }
+}
+```
+
+Le **suivi est calculé par le serveur**, jamais déduit par le client : deux
+clients qui additionneraient différemment afficheraient deux « restes à
+collecter », ce qui est inacceptable sur de l'argent.
+
+Les lignes **annulées sont exclues** de `expected_amount` : un membre dispensé
+ne doit pas gonfler ce que le club croit avoir à recevoir. Les impayés
+arrivent en tête de `lines`.
+
+### `POST /participations` · `PATCH /participations/{uuid}` — trésorier
+
+`created_by` vient de la session. Une collecte naît en `DRAFT`. Changer
+`expected_amount` ne réécrit **pas** les lignes existantes : le montant y est
+figé à l'affectation, sinon un versement de 5 000 apparaîtrait partiel sur une
+dette rétroactivement portée à 7 500.
+
+Une collecte **clôturée ne se modifie plus** : c'est un fait comptable, et la
+retoucher fausserait un rapport peut-être déjà présenté en assemblée.
+
+### `PATCH /participations/{uuid}/status`
+
+```
+DRAFT  → OPEN, CANCELLED
+OPEN   → CLOSED, CANCELLED
+CLOSED, CANCELLED → (aucune)
+```
+
+Une collecte close **ne se rouvre pas** : les comptes ont été arrêtés. On en
+crée une nouvelle. Transition interdite : `422 INVALID_TRANSITION`.
+
+### `POST /participations/{uuid}/members`
+
+```json
+{ "members": ["<uuid>", "…"], "amount": 2500, "collector": "<uuid>" }
+```
+
+**Tout est facultatif.** Sans `members`, ce sont **tous les membres actifs** :
+le geste réel d'une cotisation annuelle, et on ne demande pas au bureau de
+cocher 250 cases pour dire « tout le monde ». Les anciens membres et les
+suspendus sont écartés : les appeler gonflerait un attendu que personne ne
+versera.
+
+L'opération est **idempotente** : relancer ne crée pas de doublon et ne
+réinitialise aucune ligne. `meta` renvoie `{ created, skipped }`.
+
+### `PATCH /participations/{uuid}/members/{line}`
+
+Accepte `expected_amount`, `collector`, `exempt`, `note`.
+
+**N'accepte ni `paid_amount`, ni `status`.** Ces champs sont dérivés des
+paiements réels ; les recevoir du client laisserait quiconque se déclarer à
+jour de cotisation — la falsification la plus simple imaginable sur cette
+application. Un montant inférieur à ce qui a déjà été versé est refusé.
+
+### `DELETE /participations/{uuid}/members/{line}`
+
+Tant que rien n'a été encaissé, la ligne disparaît — c'est une erreur de
+saisie. **Dès qu'un franc a été reçu, elle est ANNULÉE et conservée** :
+supprimer laisserait un paiement orphelin, c'est-à-dire de l'argent encaissé
+sans dette correspondante. La réponse dit lequel des deux s'est produit
+(`outcome`).
+
+De même, `DELETE /participations/{uuid}` refuse (`422 HAS_PAYMENTS`) si la
+collecte a reçu des paiements : on l'annule.
+
+### `GET /participations/mine` — collecteur
+
+Ce qu'un collecteur doit aller chercher sur le terrain, **toutes collectes
+confondues** : c'est la vraie question du jour J. Sans cette route, il devrait
+ouvrir chaque collecte et y chercher son nom. Les lignes soldées en sont
+exclues — elles n'appellent plus de déplacement.
+
 ## Événements — phase 9
 
 Les sorties officielles du club. Trois cercles de droits : tout membre voit et
@@ -394,7 +510,9 @@ Statistiques du tableau de bord.
                         "next": { "uuid": "…", "title": "Grand Tour Cyclo Dakar",
                                   "starts_at": "2026-09-08T07:30:00+00:00",
                                   "location_name": "Place de la Nation" } },
-    "participations": { "available": false, "phase": 10 },
+    "participations": { "visible": true, "available": true, "open_campaigns": 2,
+                        "expected_amount": 1250000, "collected_amount": 480000,
+                        "remaining_amount": 770000, "lines": 250 },
     "finance":        { "visible": true, "available": false, "phase": 13 },
     "generated_at": "2026-08-31T16:00:00+00:00"
   }

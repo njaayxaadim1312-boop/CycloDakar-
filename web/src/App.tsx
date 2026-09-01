@@ -6,6 +6,9 @@ import { ActivityHomePage } from '@/pages/ActivityHomePage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
 import { ManagementPage } from '@/pages/ManagementPage'
+import { ParticipationDetailPage } from '@/pages/participations/ParticipationDetailPage'
+import { ParticipationFormPage } from '@/pages/participations/ParticipationFormPage'
+import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { RecordPage } from '@/pages/record/RecordPage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
@@ -45,6 +48,7 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 8  /stats
  *   PHASE 9  /events, /events/nouveau, /events/:uuid, /events/:uuid/modifier
  *   PHASE 9bis  / (activite), /gestion, /gestion/tableau-de-bord
+ *   PHASE 10 /participations, /participations/nouvelle, /participations/:uuid
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
@@ -52,6 +56,7 @@ const IMPLEMENTED = new Set([
   '/',
   '/gestion',
   '/record',
+  '/participations',
   '/system',
   '/members',
   '/profile',
@@ -111,6 +116,12 @@ export default function App() {
 
           {/* Enregistrement d'une sortie depuis le navigateur. */}
           <Route path="/record" element={<RecordPage />} />
+
+          {/* Participations — phase 10. « nouvelle » avant « :uuid ». */}
+          <Route path="/participations" element={<ParticipationsPage />} />
+          <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />
+          <Route path="/participations/:uuid" element={<ParticipationDetailPage />} />
+          <Route path="/participations/:uuid/modifier" element={<ParticipationFormPage />} />
 
           {/* Statistiques personnelles — phase 8 */}
           <Route path="/stats" element={<PersonalStatsPage />} />

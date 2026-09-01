@@ -23,7 +23,12 @@ import {
   YAxis,
 } from 'recharts'
 import { getData } from '@/lib/api'
-import { formatDistance, formatDurationLong, formatInteger } from '@/lib/format'
+import {
+  formatDistance,
+  formatDurationLong,
+  formatFcfa,
+  formatInteger,
+} from '@/lib/format'
 import { fetchDashboardStats } from '@/lib/stats'
 import { useCurrentUser } from '@/stores/auth'
 import type { Health, MemberStatusCode } from '@/types/api'
@@ -158,13 +163,19 @@ export function DashboardPage() {
               loading={stats.isLoading}
             />
           )}
-          <StatTile
-            icon={Wallet}
-            label="Reste à collecter"
-            to="/participations"
-            phase={stats.data?.participations.phase}
-            loading={stats.isLoading}
-          />
+          {/* Le bloc répond `visible: false` sous le rôle de collecteur :
+              on ne montre alors rien du tout, plutôt qu'un zéro qui
+              laisserait croire que le club n'attend rien. */}
+          {stats.data?.participations.visible === true && (
+            <StatTile
+              icon={Wallet}
+              label="Reste à collecter"
+              to="/participations"
+              value={formatFcfa(stats.data.participations.remaining_amount)}
+              hint={`${stats.data.participations.open_campaigns} collecte(s) en cours`}
+              loading={stats.isLoading}
+            />
+          )}
         </div>
       </section>
 

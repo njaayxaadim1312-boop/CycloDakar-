@@ -330,11 +330,30 @@ export interface ClubEventStats {
   } | null
 }
 
+/**
+ * Reste à collecter, sur le tableau de bord.
+ *
+ * `visible: false` quand le compte n'a pas le droit de collecter : un zéro
+ * laisserait croire que le club n'attend rien.
+ */
+export type ParticipationDashboard =
+  | { visible: false }
+  | {
+      visible: true
+      available: true
+      open_campaigns: number
+      expected_amount: Fcfa
+      collected_amount: Fcfa
+      remaining_amount: Fcfa
+      lines: number
+    }
+
 export interface DashboardStats {
   members: MemberStats
   activities: ClubActivityStats
   events: ClubEventStats
-  participations: PendingModule
+  /** `visible: false` sous le rôle de collecteur — et non un zéro. */
+  participations: ParticipationDashboard
   /** `visible: false` quand le club garde la caisse privée. */
   finance: { visible: boolean; available?: false; phase?: number }
   generated_at: string
@@ -665,4 +684,89 @@ export interface EventTally {
   present: number
   max_participants: number | null
   seats_left: number | null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Participations (phase 10)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type ParticipationStatusCode = 'DRAFT' | 'OPEN' | 'CLOSED' | 'CANCELLED'
+
+export type ParticipationLineStatusCode =
+  | 'NON_PAYE'
+  | 'PARTIELLEMENT_PAYE'
+  | 'PAYE'
+  | 'ANNULE'
+
+/**
+ * Le suivi du bureau, en trois chiffres.
+ *
+ * Calculé par le serveur, jamais déduit ici : deux clients qui
+ * additionneraient différemment afficheraient deux « restes à collecter », ce
+ * qui est inacceptable sur de l'argent.
+ */
+export interface ParticipationTally {
+  expected_amount: Fcfa
+  collected_amount: Fcfa
+  remaining_amount: Fcfa
+  members: number
+  paid_members: number
+  progress_percent: number
+}
+
+/**
+ * Une dette : ce qu'un membre doit sur une collecte.
+ *
+ * `paid_amount` et `status` sont **dérivés** des paiements réels et exposés en
+ * lecture seule. Aucune route ne les accepte en entrée.
+ */
+export interface ParticipationLine {
+  id: number
+  member?: {
+    uuid: string
+    matricule: string
+    full_name: string
+    initials: string
+    photo_url: string | null
+    phone_formatted: string | null
+  }
+  expected_amount: Fcfa
+  paid_amount: Fcfa
+  remaining_amount: Fcfa
+  status: ParticipationLineStatusCode
+  status_label: string
+  collector?: { uuid: string; name: string } | null
+  last_payment_at: string | null
+  note: string | null
+}
+
+/** Une campagne de collecte. Tous les montants sont des entiers de FCFA. */
+export interface Participation {
+  uuid: string
+  name: string
+  description: string | null
+
+  status: ParticipationStatusCode
+  status_label: string
+
+  /** Part unitaire attendue de chaque membre. */
+  expected_amount: Fcfa
+
+  starts_on: string | null
+  due_on: string | null
+  is_overdue: boolean
+
+  tally: ParticipationTally
+
+  event?: { uuid: string; title: string; starts_at: string | null }
+  created_by?: { uuid: string; name: string }
+  lines?: ParticipationLine[]
+
+  permissions: {
+    update: boolean
+    delete: boolean
+    assign: boolean
+  } | null
+
+  created_at: string | null
 }
