@@ -250,6 +250,129 @@ le geste à faire quand on perd son téléphone.
 Le mot de passe actuel est exigé même si la session est valide : un téléphone laissé
 déverrouillé ne doit pas suffire à verrouiller le compte de son propriétaire.
 
+## Événements — phase 9
+
+Les sorties officielles du club. Trois cercles de droits : tout membre voit et
+s'inscrit, un collecteur crée et pointe, seul l'auteur ou un administrateur
+modifie et annule.
+
+### `GET /events` — authentifié
+
+| Paramètre | Valeurs | Défaut |
+|---|---|---|
+| `scope` | `upcoming` · `past` · `all` | `upcoming` |
+| `sport` | `CYCLING` · `RUNNING` · `HIKING` | — |
+| `status` | `DRAFT` · `PUBLISHED` · `ONGOING` · `DONE` · `CANCELLED` | — |
+| `mine` | `1` — seulement mes inscriptions | — |
+
+Les **brouillons ne sortent jamais** de cette liste, sauf pour leur auteur et
+l'administration : le bureau prépare une sortie, corrige l'horaire, hésite sur
+le parcours. Annoncer puis déplacer une date coûte plus de confiance
+qu'annoncer tard.
+
+### `GET /events/{uuid}` — authentifié
+
+```json
+{
+  "data": {
+    "uuid": "…",
+    "title": "Grand Tour Cyclo Dakar",
+    "sport": "CYCLING", "sport_label": "Cyclisme",
+    "status": "PUBLISHED", "status_label": "Annoncé",
+    "starts_at": "2026-09-08T07:30:00+00:00",
+    "location_name": "Place de la Nation",
+    "planned_distance_m": 35000,
+    "difficulty": "MEDIUM", "difficulty_label": "Modéré",
+    "max_participants": 25, "seats_taken": 24, "seats_left": 1, "is_full": false,
+    "registrations_open": true,
+    "my_registration": { "status": "WAITLIST", "queue_position": 2, "…": {} },
+    "participants": [{ "member": { "…": {} }, "registration_status": "REGISTERED", "…": {} }],
+    "permissions": { "update": false, "delete": false, "manage_attendance": false }
+  }
+}
+```
+
+`planned_distance_m` est en **mètres**, comme toutes les distances de l'API.
+`seats_left` vaut `null` quand la sortie n'est pas limitée — et non un grand
+nombre, qui laisserait croire à une limite haute.
+
+La liste des participants ne porte que le **nom, les initiales et le
+matricule** : savoir qui vient ne suppose pas d'obtenir l'annuaire.
+
+### `POST /events` · `PATCH /events/{uuid}` — collecteur et au-dessus
+
+`created_by` vient de la session, jamais du corps de la requête. Une sortie
+naît en `DRAFT` sauf si `status: "PUBLISHED"` est demandé. `starts_at` doit être
+dans le futur à la création ; à la modification, non — corriger l'heure d'une
+sortie en cours doit rester possible.
+
+Une sortie **terminée ne se modifie plus** : c'est un fait, pas un projet, et la
+retoucher fausserait les présences déjà pointées.
+
+### `PATCH /events/{uuid}/status` — auteur ou administrateur
+
+Route distincte de la modification : publier, démarrer ou annuler sont des
+**actes**, pas des champs. Transitions autorisées :
+
+```
+DRAFT      → PUBLISHED, CANCELLED
+PUBLISHED  → ONGOING, DONE, CANCELLED
+ONGOING    → DONE, CANCELLED
+DONE       → (aucune)
+CANCELLED  → (aucune)
+```
+
+Une sortie annoncée **ne redevient pas un brouillon** : les membres l'ont déjà
+notée, on l'annule — ce qui les prévient. Une transition interdite renvoie
+`422 INVALID_TRANSITION`. Redemander l'état courant est sans effet et réussit :
+un double appui sur un réseau lent ne doit rien casser.
+
+### `POST /events/{uuid}/register` · `DELETE /events/{uuid}/register`
+
+Le membre vient de la **session** : on ne s'inscrit pas à la place d'un autre.
+
+Si la sortie est pleine, l'inscription bascule en `WAITLIST` avec un
+`queue_position` — refuser sèchement ferait perdre au club des participants qui
+seraient venus si une place s'était libérée. Un désistement libérant une place
+**promeut immédiatement** le premier de la file.
+
+Le rang dans la file **ne se recalcule jamais**. Il est attribué à l'inscription
+et ne bouge plus ; une réinscription après désistement repart en fin de file.
+
+Réinscrire un membre déjà inscrit est **idempotent** : pas de doublon, pas de
+retour en fin de file.
+
+Les deux routes renvoient les compteurs à jour dans `meta` :
+
+```json
+{ "meta": { "registered": 25, "waitlist": 3, "cancelled": 1,
+            "present": 0, "max_participants": 25, "seats_left": 0 } }
+```
+
+Le client n'a ainsi jamais à recalculer ce compte lui-même — ce qui divergerait
+dès qu'un autre membre s'inscrit en même temps.
+
+### `POST /events/{uuid}/attendance` — collecteur et au-dessus
+
+```json
+{ "member": "<uuid du membre>", "status": "PRESENT" }
+```
+
+`checked_in_by` et `checked_in_at` viennent de la session et de l'horloge du
+serveur. C'est une **signature** : si le client pouvait la fournir, la liste des
+présents ne vaudrait plus rien — et ces listes serviront à justifier des
+participations financières.
+
+Trois états : `UNKNOWN` (personne n'a pointé), `PRESENT`, `ABSENT`. **`UNKNOWN`
+n'est pas `ABSENT`** : les confondre accuserait d'absence des membres présents
+que le bureau n'a pas eu le temps de pointer. Repasser à `UNKNOWN` efface
+l'heure et l'auteur du pointage.
+
+Pointer un membre **non inscrit l'inscrit sur place** : celui qui se présente le
+jour même est un participant réel, et c'est précisément ce que la liste doit
+établir. Le pointage n'est possible que sur une sortie `ONGOING` ou `DONE`
+(`422 ATTENDANCE_CLOSED`).
+
 ### `GET /stats/dashboard` — authentifié · phase 4
 
 Statistiques du tableau de bord.
@@ -267,7 +390,10 @@ Statistiques du tableau de bord.
     },
     "activities":     { "available": true, "total": 214, "distance_m": 4812300,
                         "moving_time_s": 618400, "this_month": 19 },
-    "events":         { "available": false, "phase": 9 },
+    "events":         { "available": true, "upcoming": 3, "my_upcoming": 1,
+                        "next": { "uuid": "…", "title": "Grand Tour Cyclo Dakar",
+                                  "starts_at": "2026-09-08T07:30:00+00:00",
+                                  "location_name": "Place de la Nation" } },
     "participations": { "available": false, "phase": 10 },
     "finance":        { "visible": true, "available": false, "phase": 13 },
     "generated_at": "2026-08-31T16:00:00+00:00"

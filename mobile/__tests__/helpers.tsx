@@ -6,6 +6,7 @@ import { api } from '../src/lib/api'
 import { ThemeProvider } from '../src/theme/useTheme'
 import type {
   Activity,
+  ClubEvent,
   CurrentUser,
   Member,
   MemberSearchResult,
@@ -170,7 +171,13 @@ export const dashboardStats = (overrides: Record<string, unknown> = {}) => ({
     moving_time_s: 618_400,
     this_month: 19,
   },
-  events: { available: false, phase: 9 },
+  events: {
+    available: true, upcoming: 3, my_upcoming: 1,
+    next: {
+      uuid: 'e-1', title: 'Grand Tour Cyclo Dakar',
+      starts_at: '2026-09-08T07:30:00+00:00', location_name: 'Place de la Nation',
+    },
+  },
   participations: { available: false, phase: 10 },
   finance: { visible: false },
   generated_at: '2026-08-31T16:00:00+00:00',
@@ -271,5 +278,70 @@ export const anActivity = (overrides: Partial<Activity> = {}): Activity => ({
   synced_at: '2026-04-12T12:05:00+00:00',
   created_at: '2026-04-12T12:05:00+00:00',
   permissions: { update: true, delete: true },
+  ...overrides,
+})
+
+/**
+ * Une sortie officielle.
+ *
+ * Le jeu par defaut porte 24 inscrits sur 25 places, avec un inscrit et un
+ * membre en liste d'attente : la configuration ou la distinction entre
+ * « a une place » et « attend une place » doit rester visible.
+ */
+export const anEvent = (overrides: Partial<ClubEvent> = {}): ClubEvent => ({
+  uuid: 'e-1',
+  title: 'Grand Tour Cyclo Dakar',
+  description: 'Depart groupe, ravitaillement a Keur Mbaye Fall.',
+  sport: 'CYCLING',
+  sport_label: 'Cyclisme',
+  status: 'PUBLISHED',
+  status_label: 'Annonce',
+  starts_at: '2026-09-08T07:30:00+00:00',
+  ends_at: '2026-09-08T11:00:00+00:00',
+  location_name: 'Place de la Nation',
+  start_lat: 14.6928,
+  start_lng: -17.4467,
+  planned_distance_m: 35_000,
+  route_polyline: null,
+  difficulty: 'MEDIUM',
+  difficulty_label: 'Modere',
+  difficulty_hint: 'Rythme soutenu, quelques relances',
+  max_participants: 25,
+  seats_taken: 24,
+  seats_left: 1,
+  is_full: false,
+  registrations_open: true,
+  my_registration: null,
+  created_by: { uuid: 'u-1', name: 'Awa Ndiaye' },
+  participants: [
+    {
+      member: {
+        uuid: 'm-1', matricule: 'CD-000042', full_name: 'Khadim Ndiaye',
+        initials: 'KN', photo_url: null,
+      },
+      registration_status: 'REGISTERED',
+      registration_status_label: 'Inscrit',
+      queue_position: null,
+      registered_at: '2026-09-01T09:00:00+00:00',
+      attendance_status: 'UNKNOWN',
+      attendance_status_label: 'Non pointe',
+      checked_in_at: null,
+    },
+    {
+      member: {
+        uuid: 'm-2', matricule: 'CD-000043', full_name: 'Aminata Cisse',
+        initials: 'AC', photo_url: null,
+      },
+      registration_status: 'WAITLIST',
+      registration_status_label: "Liste d'attente",
+      queue_position: 1,
+      registered_at: '2026-09-01T10:00:00+00:00',
+      attendance_status: 'UNKNOWN',
+      attendance_status_label: 'Non pointe',
+      checked_in_at: null,
+    },
+  ],
+  permissions: { update: false, delete: false, manage_attendance: false },
+  created_at: '2026-09-01T08:00:00+00:00',
   ...overrides,
 })

@@ -301,10 +301,66 @@ Voir [gps.md](gps.md) et [risques.md](risques.md) §A et §B.
 
 ---
 
-## ⏳ Phase 9 — Événements
+## ✅ Phase 9 — Événements *(terminée)*
 
-Création de sorties officielles, parcours prévu, inscriptions, liste des participants,
-présence réelle, rappels.
+**Backend**
+
+- Tables `events` et `event_participants`, plus `activities.event_id`.
+  `dateTime()` et non `timestamp()` — rappel du piège MariaDB.
+- Dix routes : liste filtrable, fiche, création, modification, changement
+  d'état, suppression douce, inscription, désistement, liste des inscrits,
+  pointage.
+- **Concurrence sur les places.** Le bureau annonce une sortie à 25 places sur
+  WhatsApp ; vingt membres touchent « Je participe » dans la même minute. La
+  ligne de l'événement est verrouillée en écriture le temps de compter et
+  d'écrire — même protection que pour les matricules, et même raison de tester
+  sur MySQL : SQLite ignore `SELECT ... FOR UPDATE`.
+- **Liste d'attente** plutôt que refus sec : refuser ferait perdre au club des
+  participants qui seraient venus si une place s'était libérée. Un
+  désistement promeut le premier de la file.
+- **Le rang dans la file ne se recalcule jamais.** Renuméroter à chaque
+  désistement ferait remonter et descendre des membres sans qu'ils
+  comprennent pourquoi.
+- **`UNKNOWN` n'est pas `ABSENT`.** Confondre les deux accuserait d'absence des
+  membres présents que personne n'a eu le temps de pointer — et ces listes
+  justifieront des participations financières.
+- **Un brouillon est introuvable**, pas seulement inaccessible : s'y inscrire
+  renvoie 403, car un 422 nommant « Brouillon » confirmerait son existence.
+- `created_by` et `checked_in_by` viennent de la session. Un membre ne se
+  déclare pas présent lui-même.
+
+**Web**
+
+- Calendrier filtrable (à venir / passées, sport, mes inscriptions), filtres
+  portés par l'URL.
+- Fiche : inscription, cycle de vie réservé au bureau, liste des participants
+  avec pointage en un geste.
+- Formulaire : saisie en kilomètres, envoi en mètres — la conversion vit à la
+  frontière, pas dispersée dans les écrans.
+- `SelectField` / `TextareaField` extraits : la même chaîne de classes était
+  recopiée pour la quatrième fois.
+
+**Mobile**
+
+- Nouvel onglet **Sorties**, placé avant « Démarrer » pour que le geste
+  principal reste au centre de la barre.
+- Calendrier et fiche, avec inscription en bouton 72 dp.
+
+**Vérifié**
+
+- Backend : **254 tests / 757 assertions** sur MySQL (49 nouveaux).
+- Mobile : **58 tests** ; bundle Android exporté (4,8 Mo).
+- Web : `tsc -b` et build propres ; rendu headless de `/events`,
+  `/events/:uuid` et `/dashboard`, en collecteur et en membre.
+
+**Reporté**
+
+- Pointage par **scan du QR Code** → phase 11. C'est le geste réel du jour J :
+  chercher cinquante membres dans une liste sur un téléphone serait
+  inutilisable au départ d'une sortie. Le pointage web reste disponible.
+- Rappels avant la sortie et notification du membre promu depuis la liste
+  d'attente → phase 17. Les points d'accroche sont marqués dans le code.
+- Tracé du parcours prévu sur la carte → avec l'éditeur d'itinéraire, phase 15.
 
 ---
 

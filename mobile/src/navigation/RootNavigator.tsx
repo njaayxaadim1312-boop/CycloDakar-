@@ -1,11 +1,13 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { NavigationContainer, type Theme as NavTheme } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { Bike, Play, Users, UserRound } from 'lucide-react-native'
+import { Bike, CalendarDays, Play, Users, UserRound } from 'lucide-react-native'
 import { useEffect } from 'react'
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native'
 import { ActivityDetailScreen } from '../screens/ActivityDetailScreen'
 import { HistoryScreen } from '../screens/HistoryScreen'
+import { EventDetailScreen } from '../screens/events/EventDetailScreen'
+import { EventsScreen } from '../screens/events/EventsScreen'
 import { HomeScreen } from '../screens/HomeScreen'
 import { MemberDetailScreen } from '../screens/MemberDetailScreen'
 import { MembersScreen } from '../screens/MembersScreen'
@@ -22,7 +24,7 @@ import { useTheme } from '../theme/useTheme'
  * Navigation de l'application mobile.
  *
  *   non connecté  →  pile Connexion / Inscription
- *   connecté      →  onglets Accueil · Membres · Profil
+ *   connecté      →  onglets Accueil · Sorties · Membres · Profil
  *
  * L'onglet central « Démarrer » est le geste principal de l'application : il
  * est au milieu de la barre, là où le pouce tombe naturellement, et porte une
@@ -38,6 +40,11 @@ export type HomeStackParams = {
   HomeFeed: undefined
   History: undefined
   ActivityDetail: { uuid: string }
+}
+
+export type EventsStackParams = {
+  EventsList: undefined
+  EventDetail: { uuid: string }
 }
 
 export type MembersStackParams = {
@@ -57,6 +64,7 @@ export type AuthStackParams = {
 
 const Tabs = createBottomTabNavigator()
 const HomeStack = createNativeStackNavigator<HomeStackParams>()
+const EventsStack = createNativeStackNavigator<EventsStackParams>()
 const MembersStack = createNativeStackNavigator<MembersStackParams>()
 const ProfileStack = createNativeStackNavigator<ProfileStackParams>()
 const AuthStack = createNativeStackNavigator<AuthStackParams>()
@@ -66,9 +74,11 @@ const AuthStack = createNativeStackNavigator<AuthStackParams>()
 /**
  * Pile de l'onglet Accueil.
  *
- * L'historique et le détail d'une sortie vivent ici plutôt que dans un
- * cinquième onglet : la barre en compte déjà quatre, et un cinquième
- * rétrécirait des cibles tactiles qu'on vise parfois avec des gants.
+ * L'historique et le détail d'une sortie vivent ici parce qu'ils prolongent
+ * « mes chiffres » : on y arrive depuis ses propres cumuls, pas depuis le
+ * menu. Les événements, eux, sont une destination à part entière et méritent
+ * leur onglet — la barre en compte cinq, le maximum tenable avant que les
+ * cibles ne deviennent trop étroites pour un pouce ganté.
  */
 function HomeNavigator() {
   return (
@@ -100,6 +110,25 @@ function HomeNavigator() {
         )}
       </HomeStack.Screen>
     </HomeStack.Navigator>
+  )
+}
+
+/** Pile de l'onglet Sorties : calendrier puis fiche. */
+function EventsNavigator() {
+  return (
+    <EventsStack.Navigator screenOptions={{ headerShown: false }}>
+      <EventsStack.Screen name="EventsList">
+        {({ navigation }) => (
+          <EventsScreen onOpenEvent={(uuid) => navigation.navigate('EventDetail', { uuid })} />
+        )}
+      </EventsStack.Screen>
+
+      <EventsStack.Screen name="EventDetail">
+        {({ navigation, route }) => (
+          <EventDetailScreen uuid={route.params.uuid} onBack={() => navigation.goBack()} />
+        )}
+      </EventsStack.Screen>
+    </EventsStack.Navigator>
   )
 }
 
@@ -184,8 +213,17 @@ function AppTabs() {
         }}
       />
 
+      <Tabs.Screen
+        name="Sorties"
+        component={EventsNavigator}
+        options={{
+          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+        }}
+      />
+
       {/*
-        Onglet central, volontairement mis en avant. `unmountOnBlur` est
+        Onglet central — troisième sur cinq, là où le pouce tombe
+        naturellement. `unmountOnBlur` est
         DÉSACTIVÉ par défaut, et c'est ce qu'on veut : quitter l'onglet
         pendant une sortie ne doit rien interrompre — l'enregistrement vit de
         toute façon dans la tâche de fond et dans SQLite.
