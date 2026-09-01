@@ -60,7 +60,7 @@ export function ForgotPasswordPage() {
         </Link>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         {error && !error.fieldError('login') && (
           <div
             role="alert"
@@ -72,6 +72,7 @@ export function ForgotPasswordPage() {
         )}
 
         <Field
+          compact
           label="Téléphone ou email"
           name="login"
           autoComplete="username"

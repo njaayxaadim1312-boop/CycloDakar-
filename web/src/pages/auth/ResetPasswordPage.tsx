@@ -80,7 +80,7 @@ export function ResetPasswordPage() {
       title="Nouveau mot de passe"
       subtitle={`Compte : ${login}`}
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         {error && !error.fieldError('password') && (
           <div
             role="alert"
@@ -92,6 +92,7 @@ export function ResetPasswordPage() {
         )}
 
         <Field
+          compact
           label="Nouveau mot de passe"
           name="password"
           type="password"
@@ -106,6 +107,7 @@ export function ResetPasswordPage() {
         />
 
         <Field
+          compact
           label="Confirmer le mot de passe"
           name="password_confirmation"
           type="password"

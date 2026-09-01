@@ -187,3 +187,39 @@ Icône, couleur et libellé vivent dans **un seul fichier** par plateforme
 (`web/src/lib/sports.ts`, `mobile/src/lib/sports.ts`), typés
 `Record<SportCode, …>` : TypeScript refuse de compiler tant qu'un sport manque,
 au lieu d'afficher un trou à l'exécution.
+
+## Écrans d'authentification : fixes
+
+Connexion, inscription, mot de passe oublié et réinitialisation **tiennent d'un
+coup**, sans défilement. C'est le premier écran que voit un membre : un bouton
+qu'il faut aller chercher plus bas y donne l'impression que quelque chose
+manque, ou que la page n'a pas fini de charger.
+
+Trois moyens, dans cet ordre :
+
+1. **La carte bordée** (`--cd-border-strong`, `--cd-shadow-lg`) délimite la
+   saisie au lieu de la laisser flotter, et impose de penser sa hauteur.
+2. **Les champs compacts** (`<Field compact>`) resserrent les espacements —
+   jamais la taille du texte. Le champ reste à 15 px : en dessous, Safari zoome
+   automatiquement au premier appui et l'écran « fixe » se met à sauter.
+3. **Les blancs cèdent sur fenêtre courte** (`[@media(max-height:700px)]`) :
+   petit téléphone, portable en basse résolution. La respiration se sacrifie
+   avant le contenu, et le contenu avant les cibles tactiles.
+
+Deux pièges rencontrés, à ne pas réintroduire :
+
+- **`items-center` sur un conteneur qui défile coupe le haut**, et cette partie
+  devient inatteignable — le défilement ne remonte jamais au-dessus de zéro. Sur
+  petit téléphone, le logo et le titre disparaissaient sans recours. Utiliser
+  `items-start` + `my-auto`, qui centre tant qu'il y a de la place.
+- **Sans `min-h-0` sur la colonne de l'affiche**, un élément de grille refuse de
+  descendre sous la taille de son contenu : l'image impose alors sa hauteur à
+  toute la page et le défilement revient.
+
+Mesuré au navigateur réel (Chrome DevTools Protocol), pas en jsdom, qui ne
+calcule aucune mise en page : 1366×768, 390×844 et 360×640, les quatre écrans
+entièrement visibles.
+
+Un garde-fou subsiste — `overflow-y-auto` sur la colonne du formulaire. En
+paysage, ou avec un texte agrandi par accessibilité, la hauteur peut manquer
+malgré tout : mieux vaut un léger défilement qu'un bouton hors d'atteinte.

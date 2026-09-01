@@ -54,7 +54,7 @@ export function RegisterPage() {
   return (
     <AuthLayout
       title="Créer un compte"
-      subtitle="Rejoignez la plateforme du club Cyclo Dakar."
+      subtitle="Téléphone ou email : l'un des deux suffit, c'est votre identifiant."
       footer={
         <>
           Vous avez déjà un compte ?{' '}
@@ -64,7 +64,7 @@ export function RegisterPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         {error && !hasFieldErrors && (
           <div
             role="alert"
@@ -76,6 +76,7 @@ export function RegisterPage() {
         )}
 
         <Field
+          compact
           label="Nom complet"
           name="name"
           autoComplete="name"
@@ -88,6 +89,7 @@ export function RegisterPage() {
         />
 
         <Field
+          compact
           label="Téléphone"
           name="phone"
           type="tel"
@@ -100,6 +102,7 @@ export function RegisterPage() {
         />
 
         <Field
+          compact
           label="Adresse email (facultative)"
           name="email"
           type="email"
@@ -108,10 +111,10 @@ export function RegisterPage() {
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
           error={error?.fieldError('email')}
-          hint="Nécessaire pour réinitialiser vous-même votre mot de passe."
         />
 
         <Field
+          compact
           label="Mot de passe"
           name="password"
           type="password"
@@ -120,11 +123,12 @@ export function RegisterPage() {
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
           error={error?.fieldError('password')}
-          hint="8 caractères minimum, avec au moins une lettre et un chiffre."
+          placeholder="8 caractères, lettres et chiffres"
           required
         />
 
         <Field
+          compact
           label="Confirmer le mot de passe"
           name="password_confirmation"
           type="password"
@@ -144,10 +148,6 @@ export function RegisterPage() {
           {submitting ? 'Création…' : 'Créer mon compte'}
         </button>
 
-        <p className="text-xs leading-relaxed text-[var(--cd-text-muted)]">
-          Indiquez au moins un téléphone ou une adresse email : c'est votre
-          identifiant de connexion.
-        </p>
       </form>
     </AuthLayout>
   )

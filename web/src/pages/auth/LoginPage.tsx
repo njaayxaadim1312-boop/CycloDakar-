@@ -47,7 +47,7 @@ export function LoginPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         {/*
           Erreur générale : identifiants incorrects, compte désactivé, trop de
           tentatives, serveur injoignable. Les erreurs de champ, elles, sont
@@ -64,6 +64,7 @@ export function LoginPage() {
         )}
 
         <Field
+          compact
           label="Téléphone ou email"
           name="login"
           autoComplete="username"
@@ -78,6 +79,7 @@ export function LoginPage() {
         />
 
         <Field
+          compact
           label="Mot de passe"
           name="password"
           type="password"

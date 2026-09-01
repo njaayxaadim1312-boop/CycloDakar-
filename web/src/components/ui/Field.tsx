@@ -9,6 +9,14 @@ interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> {
   hint?: ReactNode
   /** Ajoute un bouton « afficher / masquer » sur un champ mot de passe. */
   revealable?: boolean
+  /**
+   * Version resserrée, pour les écrans qui doivent tenir sans défilement.
+   *
+   * Elle ne touche qu'aux ESPACEMENTS, jamais à la hauteur de frappe : le
+   * champ reste au-dessus de la cible tactile minimale, sinon on gagnerait
+   * quelques pixels en rendant la saisie pénible sur téléphone.
+   */
+  compact?: boolean
 }
 
 /**
@@ -23,6 +31,7 @@ export function Field({
   error,
   hint,
   revealable,
+  compact = false,
   type = 'text',
   className,
   ...props
@@ -36,8 +45,11 @@ export function Field({
     .join(' ')
 
   return (
-    <div className={clsx('space-y-1.5', className)}>
-      <label htmlFor={id} className="block text-sm font-semibold">
+    <div className={clsx(compact ? 'space-y-1' : 'space-y-1.5', className)}>
+      <label
+        htmlFor={id}
+        className={clsx('block font-semibold', compact ? 'text-[13px]' : 'text-sm')}
+      >
         {label}
       </label>
 
@@ -49,7 +61,11 @@ export function Field({
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           className={clsx(
-            'w-full rounded-[var(--cd-radius-sm)] border bg-[var(--cd-surface)] px-3 py-2.5 text-[15px]',
+            'w-full rounded-[var(--cd-radius-sm)] border bg-[var(--cd-surface)] px-3',
+            // 15 px au minimum sur mobile : en dessous, Safari zoome
+            // automatiquement au premier appui dans le champ, et l'écran
+            // « fixe » se met à sauter.
+            compact ? 'py-2 text-[15px]' : 'py-2.5 text-[15px]',
             'placeholder:text-[var(--cd-text-muted)]',
             'transition-colors outline-none',
             error
