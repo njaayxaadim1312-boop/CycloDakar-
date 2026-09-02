@@ -9,6 +9,7 @@ use App\Enums\ActivityVisibility;
 use App\Enums\EventStatus;
 use App\Enums\RegistrationStatus;
 use App\Enums\Sport;
+use App\Enums\ChallengeStatus;
 use App\Enums\ParticipationStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\TransactionDirection;
@@ -16,11 +17,13 @@ use App\Enums\TransactionSource;
 use App\Enums\UserRole;
 use App\Models\Activity;
 use App\Models\CashAccount;
+use App\Models\Challenge;
 use App\Models\Participation;
 use App\Models\ParticipationMember;
 use App\Models\Payment;
 use App\Models\TransactionCategory;
 use App\Models\User;
+use App\Services\Community\ChallengeService;
 use App\Services\Finance\CashLedger;
 use App\Services\Finance\ExpenseService;
 use App\Services\Finance\PaymentService;
@@ -53,7 +56,7 @@ final class DemoDataCommand extends Command
         {--force : Autoriser hors environnement local}
         {--fresh : Supprimer les données de démonstration existantes}';
 
-    protected $description = 'Crée des sorties, des événements et un jeu de caisse de démonstration';
+    protected $description = 'Crée des sorties, des événements, une caisse et des défis de démonstration';
 
     /** Le compte avec lequel on regardera le résultat. */
     private const SHOWCASE_EMAIL = 'membre@cyclodakar.sn';
@@ -131,11 +134,13 @@ final class DemoDataCommand extends Command
         $this->createActivities($members);
         $this->createEvents($members);
         $this->createFinance($members);
+        $this->createChallenges($members);
 
         $this->newLine();
         $this->line('  <fg=green>✔</> Jeu de démonstration en place.');
         $this->line('     Connectez-vous avec <options=bold>'.self::SHOWCASE_EMAIL.'</> pour voir les anneaux remplis.');
         $this->line('     Le trésorier verra une caisse alimentée : collecte, encaissements, dépenses, don.');
+        $this->line('     Les classements et les défis sont remplis : trois défis, tout le monde inscrit.');
         $this->newLine();
 
         return self::SUCCESS;
@@ -168,6 +173,117 @@ final class DemoDataCommand extends Command
         $this->line('  <fg=gray>La caisse est conservée : le grand livre ne se supprime pas.</>');
     }
 
+
+
+    /**
+     * Des défis qui montrent les trois états qu'on veut pouvoir regarder.
+     *
+     * Un défi bien engagé, un défi presque hors de portée, un défi déjà réussi
+     * par quelqu'un. Un jeu de démonstration où tout le monde est à 40 % ne
+     * montre ni la barre pleine, ni le badge, ni la déception — donc rien de ce
+     * que l'écran a été écrit pour dire.
+     *
+     * Les objectifs sont calibrés sur les sorties réellement créées plus haut,
+     * pas tirés au hasard : un défi de 500 km sur un jeu qui en contient 90
+     * afficherait trois barres vides et ne démontrerait rien.
+     *
+     * @param  \Illuminate\Support\Collection<int, Member>  $members
+     */
+    private function createChallenges($members): void
+    {
+        $chef = User::query()->where('email', 'chef@cyclodakar.sn')->first()
+            ?? User::query()->where('role', UserRole::SuperAdmin)->first();
+
+        if ($chef === null) {
+            return;
+        }
+
+        auth()->setUser($chef);
+
+        $service = app(ChallengeService::class);
+
+        /*
+         | Les FENÊTRES diffèrent volontairement.
+         |
+         | Un défi calé sur le mois en cours affiche des barres vides quand on
+         | lance la démonstration le 2 du mois : les sorties du jeu s'étalent
+         | sur les semaines précédentes. Le premier défi couvre donc les trente
+         | derniers jours, ce qui le rend RÉUSSISSABLE — et c'est lui qui
+         | démontre la barre pleine, le badge, et l'onglet « Mes badges ».
+         |
+         | Les deux autres restent sur le mois : ils montrent une progression
+         | partielle et un objectif ambitieux, les deux autres états que
+         | l'écran a été écrit pour dire.
+         */
+        $defis = [
+            [
+                'title' => 'Régularité — 3 sorties',
+                'description' => 'Trois sorties en trente jours. Le rythme compte plus que la distance.',
+                'metric' => 'activities',
+                // 3 et non 4 : c'est ce que le compte vitrine a réellement
+                // fait. Un défi qu'aucun compte de démonstration ne réussit ne
+                // montre ni la barre pleine, ni le badge — c'est-à-dire rien
+                // de ce que cet écran a été écrit pour dire.
+                'target' => 3,
+                'icon' => 'calendar-check',
+                'sport' => null,
+                'starts_on' => now()->subDays(30)->toDateString(),
+                'ends_on' => now()->addDays(7)->toDateString(),
+            ],
+            [
+                'title' => '100 km ce mois-ci',
+                'description' => 'Toutes disciplines confondues. À vélo, à pied, peu importe.',
+                'metric' => 'distance',
+                'target' => 100_000,
+                'icon' => 'route',
+                'sport' => null,
+            ],
+            [
+                'title' => 'Le grand défi — 400 km',
+                'description' => "Pour ceux qui roulent beaucoup. Personne n'est obligé.",
+                'metric' => 'distance',
+                'target' => 400_000,
+                'icon' => 'mountain',
+                'sport' => Sport::Cycling->value,
+            ],
+        ];
+
+        $inscrits = 0;
+
+        foreach ($defis as $donnees) {
+            /*
+             | IDEMPOTENT, sur le titre.
+             |
+             | `--fresh` n'efface PAS les défis : les supprimer ferait
+             | disparaître les badges de ceux qui les avaient gagnés, et un
+             | jeu de démonstration ne doit pas apprendre ce réflexe-là. Sans
+             | cette clé, relancer la commande trois fois créerait neuf défis.
+             */
+            $existant = Challenge::withTrashed()
+                ->where('title', $donnees['title'])
+                ->first();
+
+            $defi = $existant ?? Challenge::create($donnees + [
+                // Par défaut le mois en cours ; un défi peut fournir sa
+                // propre fenêtre — voir le commentaire ci-dessus.
+                'starts_on' => now()->startOfMonth()->toDateString(),
+                'ends_on' => now()->endOfMonth()->toDateString(),
+                'status' => ChallengeStatus::Published,
+                'created_by' => $chef->id,
+            ]);
+
+            // Tout le monde s'inscrit : c'est ce qui remplit le classement du
+            // défi, et c'est aussi ce qui rend visible l'écart entre les
+            // participants — un défi à un seul inscrit ne montre rien.
+            foreach ($members as $membre) {
+                $service->join($defi, $membre);
+                $inscrits++;
+            }
+        }
+
+        $this->line('  <fg=green>✔</> Défis : '.count($defis).' défi(s), '
+            .$inscrits.' inscription(s).');
+    }
 
     /**
      * Une caisse qui ressemble à un vrai mois de club.

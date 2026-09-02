@@ -29,3 +29,18 @@ Artisan::command('inspire', function () {
 Schedule::command('finance:recompute-balance')
     ->dailyAt('03:00')
     ->withoutOverlapping();
+
+/**
+ * Fige les classements des périodes closes (phase 16).
+ *
+ * 3 h 20 : après la vérification de caisse, et à une heure où personne
+ * n'enregistre de sortie — une lecture des activités ne croise ainsi aucune
+ * écriture.
+ *
+ * La commande ne fige jamais une période en cours, et refiger une période déjà
+ * figée la réécrit à l'identique. Elle peut donc tourner tous les jours sans
+ * qu'on ait à raisonner sur le calendrier.
+ */
+Schedule::command('cyclo:snapshot-leaderboards')
+    ->dailyAt('03:20')
+    ->withoutOverlapping();

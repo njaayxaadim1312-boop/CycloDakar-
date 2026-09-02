@@ -742,11 +742,82 @@ Voir [video.md](video.md).
 
 ---
 
-## ⏳ Phase 16 — Challenges et classements
+## ✅ Phase 16 — Challenges et classements *(terminée)*
 
-Classements hebdomadaire, mensuel, annuel ; par distance, nombre d'activités, temps
-et par sport ; challenges à objectif avec progression ; badges ; instantanés de
-classement pour éviter de rebalayer les activités.
+**Une sortie privée ne classe jamais son auteur.**
+
+C'est la règle qui gouverne tout le module, et elle vaut d'être dite avant les
+fonctionnalités. Un membre qui marque une sortie « privée » a demandé qu'elle ne
+soit pas vue ; la faire apparaître dans un classement — même sous forme d'un
+total, même sans la carte — trahirait exactement cette demande. Un classement
+est une publication.
+
+Le corollaire est assumé : un membre qui met tout en privé n'apparaît nulle
+part, et c'est normal. Mieux vaut un classement incomplet qu'un classement qui
+publie ce qu'on lui a confié. L'écran le dit explicitement, pour qu'on n'y voie
+pas un bug.
+
+**Les instantanés ne sont pas d'abord une optimisation.**
+
+La roadmap les demandait « pour éviter de rebalayer les activités ». La vraie
+raison est ailleurs : les sorties bougent après coup — le mobile synchronise en
+différé, un membre passe une sortie en privé une semaine plus tard, une trace
+est corrigée. Recalculé, le classement de septembre changerait donc en octobre,
+après que le club a félicité quelqu'un. Reprendre une première place déjà
+annoncée est le plus sûr moyen de faire quitter un club.
+
+Une période close est un fait, comme une collecte clôturée : `cyclo:snapshot-
+leaderboards` la fige la nuit où elle s'achève, et elle ne se retouche plus. La
+période en cours, elle, se calcule en direct — la figer n'aurait aucun sens.
+L'interface annonce lequel des deux on regarde.
+
+**Quatre mesures, parce qu'une seule ferait gagner toujours les mêmes**
+
+Distance, régularité, temps, dénivelé. La régularité est celle qui compte le
+plus pour un club : elle met en avant celui qui vient chaque dimanche, pas celui
+qui a le vélo le plus rapide. Le filtre par sport évite qu'un marcheur soit
+comparé à un cycliste — se mesurer sur la mauvaise échelle décourage au lieu
+d'entraîner.
+
+Les ex æquo suivent la convention du sport : deux membres à égalité partagent le
+rang, et le suivant saute une place.
+
+**Le rang du lecteur est affiché même hors du top 20**
+
+Un classement qui ne montre que les vingt premiers dit à tous les autres qu'ils
+ne comptent pas. Connaître son rang est précisément ce qui donne envie de le
+remonter.
+
+**Les défis : trois promesses faites aux membres**
+
+La progression compte **depuis le début du défi**, pas depuis l'inscription :
+celui qui découvre le défi le 15 alors qu'il roulait déjà ne repart pas de zéro.
+Sa barre est remplie à l'instant où il s'inscrit.
+
+Un **badge obtenu ne se reprend pas**. `completed_at` est figé : si la
+progression retombe ensuite, la date reste. Un test le vérifie en repassant une
+sortie en privé après coup — la progression tombe à zéro, le badge demeure.
+
+Un défi **terminé ne se modifie plus** : des membres ont gagné des badges sur
+ces règles-là, et en changer l'objectif après coup les invaliderait
+rétroactivement.
+
+Créer un défi relève du **chef de groupe** : c'est un acte d'animation sportive,
+qui n'a aucune raison de demander l'accès à la caisse.
+
+**Les badges ne sont pas une invention**
+
+Un badge, ici, EST un défi réussi — avec ses règles, sa période et sa date.
+Créer une taxonomie de badges détachée des défis aurait demandé d'inventer des
+distinctions que le club n'a pas demandées.
+
+**Vérifié**
+
+426 tests backend (20 pour cette phase). Le jeu de démonstration couvre les
+trois états qu'un écran de défi doit savoir montrer : un défi réussi avec son
+badge, un défi bien engagé, un défi ambitieux à zéro. Il est idempotent sur le
+titre — relancer `cyclo:demo` n'empile pas les défis, et n'en efface aucun,
+puisque les effacer ferait disparaître des badges gagnés.
 
 ---
 

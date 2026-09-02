@@ -876,6 +876,78 @@ compte. Le téléchargement passe par cette route, qui vérifie le rôle et rép
 
 ---
 
+## 3 quater. Classements et défis — phase 16
+
+### `GET /leaderboard` — tout membre
+
+```http
+GET /leaderboard?period=week|month|year&metric=distance|activities|duration|elevation&sport=&key=
+```
+
+**Une sortie privée ne classe jamais son auteur.** C'est la règle qui gouverne
+tout ce module. Un membre qui marque une sortie « privée » a demandé qu'elle ne
+soit pas vue ; la faire apparaître dans un classement — même sous forme d'un
+total — trahirait exactement cette demande. Un classement est une publication.
+
+Le corollaire est assumé : un membre qui met tout en privé n'apparaît nulle
+part.
+
+`meta.frozen` dit si le classement est **figé**. Une période close ne bouge
+plus ; une période en cours peut encore changer. Ce n'est pas un détail
+technique à cacher : c'est la différence entre « j'ai gagné » et « je suis en
+tête pour l'instant ».
+
+`meta.me` porte le rang du lecteur **même hors du top 20** — `rank: null` s'il
+n'a rien de classé. Un classement qui ne montre que les premiers dit à tous les
+autres qu'ils ne comptent pas.
+
+`key` permet de relire une période passée : `2026-08`, `2026-W35`.
+
+Les valeurs sont en **unité SI** : mètres, secondes, ou nombre de sorties.
+
+### `GET|POST /challenges` — lecture ouverte, création réservée au chef de groupe
+
+```json
+{ "title": "100 km en septembre", "metric": "distance", "target": 100000,
+  "starts_on": "2026-09-01", "ends_on": "2026-09-30", "status": "PUBLISHED" }
+```
+
+`target` est en **unité SI** — « 500 km » vaut `500000`. C'est l'interface qui
+convertit ce que saisit un chef de groupe ; un champ unique qui signifierait
+tantôt des kilomètres, tantôt des mètres produirait un défi mille fois trop
+court.
+
+**Créer relève du chef de groupe**, pas du trésorier : un défi est un acte
+d'animation sportive. Un défi terminé ne se modifie plus — des membres ont gagné
+des badges sur ces règles-là.
+
+### `POST /challenges/{uuid}/join` · `POST /challenges/{uuid}/leave`
+
+**La progression compte depuis le DÉBUT du défi**, pas depuis l'inscription : un
+membre qui découvre le défi le 15 et roulait déjà depuis le 1er ne repart pas de
+zéro. La réponse renvoie le défi complet, progression comprise.
+
+**Quitter est refusé si le défi est déjà réussi** (`422 LEAVE_REFUSED`) : la
+ligne porte un badge, et un badge fait partie de l'histoire du membre.
+
+### `GET /challenges/{uuid}/standings`
+
+Les finisseurs d'abord, **dans l'ordre où ils ont fini** — puis les autres par
+progression. Un défi n'est pas un classement à la performance mais un objectif :
+celui qui l'a atteint le premier passe devant celui qui l'a atteint après, quel
+que soit son total.
+
+### `GET /challenges/badges` — tout membre
+
+Les défis réussis du lecteur. Un badge n'est pas une récompense inventée : c'est
+un défi réel, avec ses règles, sa période et sa date de réussite.
+
+**Un badge obtenu ne se reprend pas.** `completed_at` est figé : si la
+progression retombe ensuite — sortie supprimée, passée en privé, trace
+corrigée — la date reste.
+
+---
+
 ## 4. Contrôle par rôle
 
 Six rôles, du moins au plus étendu :
@@ -969,12 +1041,9 @@ POST   /internal/video-jobs/{uuid}/complete
 POST   /internal/video-jobs/{uuid}/fail
 ```
 
-### Phase 16–17 — Communauté
+### Phase 17 — Notifications
 
 ```http
-GET    /leaderboard?period=week|month|year&metric=distance|activities|duration&sport=
-GET    /challenges
-POST   /challenges/{id}/join
 GET    /notifications
 POST   /notifications/{id}/read
 POST   /notifications/read-all

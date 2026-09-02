@@ -60,7 +60,7 @@ const FINANCE: RoleCode[] = ['TREASURER', 'ADMIN', 'SUPER_ADMIN']
 const COLLECT: RoleCode[] = ['COLLECTOR', 'TREASURER', 'ADMIN', 'SUPER_ADMIN']
 
 /** Dernière phase effectivement livrée — à incrémenter à chaque phase finie. */
-export const DELIVERED_THROUGH_PHASE = 14
+export const DELIVERED_THROUGH_PHASE = 16
 
 /* -------------------------------------------------------------------------- */
 /* Menu principal — l'exercice, et rien d'autre                               */
@@ -129,7 +129,7 @@ export const navigation: NavSection[] = [
         icon: Trophy,
         phase: 16,
         summary:
-          'Classements hebdomadaires, mensuels et annuels par distance, nombre de sorties, temps et par sport.',
+          "Semaine, mois ou année ; par distance, régularité, temps ou dénivelé, tous sports ou par sport. Une sortie privée n'y figure jamais — un classement est une publication.",
       },
       {
         to: '/challenges',
@@ -137,7 +137,7 @@ export const navigation: NavSection[] = [
         icon: Footprints,
         phase: 16,
         summary:
-          'Défis à objectif avec suivi de progression et badges — « 500 km en septembre », par exemple.',
+          "« 100 km ce mois-ci », « 8 sorties » : un objectif, une barre de progression, et un badge qui reste acquis une fois gagné.",
       },
     ],
   },

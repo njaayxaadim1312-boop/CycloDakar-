@@ -12,6 +12,8 @@ import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { CashPage } from '@/pages/finance/CashPage'
 import { ExpensesPage } from '@/pages/finance/ExpensesPage'
 import { LedgerPage } from '@/pages/finance/LedgerPage'
+import { ChallengesPage } from '@/pages/community/ChallengesPage'
+import { LeaderboardPage } from '@/pages/community/LeaderboardPage'
 import { ReportsPage } from '@/pages/finance/ReportsPage'
 import { CollectionsPage } from '@/pages/payments/CollectionsPage'
 import { CollectPage } from '@/pages/payments/CollectPage'
@@ -93,6 +95,10 @@ const IMPLEMENTED = new Set([
 
   // PHASE 14
   '/finance/reports',
+
+  // PHASE 16
+  '/leaderboard',
+  '/challenges',
 ])
 
 export default function App() {
@@ -171,6 +177,11 @@ export default function App() {
               contiendra : un rapport telecharge sans avoir pu etre regarde se
               redecouvre a l'ouverture, la veille d'une assemblee. */}
           <Route path="/finance/reports" element={<ReportsPage />} />
+
+          {/* Communaute — PHASE 16. Une sortie privee ne classe jamais son
+              auteur : la regle vit cote serveur, en un seul endroit. */}
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/challenges" element={<ChallengesPage />} />
 
           <Route path="/participations" element={<ParticipationsPage />} />
           <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />

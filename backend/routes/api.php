@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ActivityController;
+use App\Http\Controllers\Api\V1\ChallengeController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\EventParticipationController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\V1\FinanceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\ParticipationController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
@@ -384,6 +386,48 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         /*
         |----------------------------------------------------------------------
+        | Classements et defis — PHASE 16
+        |----------------------------------------------------------------------
+        |
+        | UNE SORTIE PRIVEE NE CLASSE JAMAIS SON AUTEUR. La regle vit dans
+        | `LeaderboardService` et `ChallengeService`, en un seul endroit
+        | chacun, precisement pour qu'elle ne puisse pas etre oubliee dans une
+        | variante. Un classement est une PUBLICATION : y faire apparaitre une
+        | sortie qu'on a demande a garder privee trahirait cette demande.
+        |
+        | Creer un defi releve du CHEF DE GROUPE, pas du tresorier : c'est un
+        | acte d'animation sportive. Participer est ouvert a tout membre, sans
+        | validation — un defi qu'il faut demander a rejoindre n'est plus un
+        | defi.
+        |
+        | Rejoindre et quitter sont des POST : ce sont des ACTES. Un DELETE sur
+        | une participation laisserait croire qu'on peut effacer un badge deja
+        | gagne, ce que le service refuse justement de faire.
+        */
+        Route::get('/leaderboard', [LeaderboardController::class, 'index'])
+            ->name('leaderboard');
+
+        Route::prefix('challenges')->name('challenges.')->group(function (): void {
+            // Declaree AVANT /{challenge} pour que « mine » ne soit pas pris
+            // pour un uuid — meme piege qu'en phase 10.
+            Route::get('/badges', [ChallengeController::class, 'badges'])->name('badges');
+
+            Route::get('/', [ChallengeController::class, 'index'])->name('index');
+            Route::post('/', [ChallengeController::class, 'store'])->name('store');
+
+            Route::get('/{challenge}', [ChallengeController::class, 'show'])->name('show');
+            Route::patch('/{challenge}', [ChallengeController::class, 'update'])->name('update');
+            Route::delete('/{challenge}', [ChallengeController::class, 'destroy'])
+                ->name('destroy');
+
+            Route::get('/{challenge}/standings', [ChallengeController::class, 'standings'])
+                ->name('standings');
+            Route::post('/{challenge}/join', [ChallengeController::class, 'join'])->name('join');
+            Route::post('/{challenge}/leave', [ChallengeController::class, 'leave'])->name('leave');
+        });
+
+        /*
+        |----------------------------------------------------------------------
         | Modules à venir
         |----------------------------------------------------------------------
         |
@@ -395,7 +439,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}
         | PHASE 15 — /activities/{id}/video, /video-jobs/{id}
-        | PHASE 16 — /challenges, /leaderboard
         | PHASE 17 — /notifications
         */
     });

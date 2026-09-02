@@ -1083,3 +1083,177 @@ export interface FinancialReport {
 
   generated_at: string
 }
+
+/* -------------------------------------------------------------------------- */
+/* Classements et défis — PHASE 16                                            */
+/* -------------------------------------------------------------------------- */
+
+export type ChallengeMetricCode = 'distance' | 'activities' | 'duration' | 'elevation'
+
+export type ChallengeStatusCode = 'DRAFT' | 'PUBLISHED' | 'CANCELLED'
+
+export type LeaderboardPeriod = 'week' | 'month' | 'year'
+
+/**
+ * Une ligne de classement.
+ *
+ * `value` est en **unité SI** — mètres, secondes, ou nombre de sorties selon la
+ * mesure. La conversion se fait à l'affichage, comme partout ailleurs.
+ *
+ * `rank` gère les ex æquo à la convention du sport : deux membres à égalité
+ * partagent le rang, et le suivant saute une place.
+ */
+export interface LeaderboardEntry {
+  rank: number
+  member: {
+    uuid: string
+    full_name: string
+    initials: string
+    matricule: string
+    photo_url: string | null
+  }
+  member_id: number
+  value: number
+  /** Le nombre de sorties qui composent ce total. */
+  activities: number
+}
+
+/**
+ * Le rang du lecteur, même hors du classement affiché.
+ *
+ * `rank: null` signifie « pas classé » — il n'a rien fait sur la période. Ce
+ * n'est pas la même chose qu'un rang absent, qui voudrait dire « pas encore
+ * chargé ».
+ */
+export interface MyRank {
+  rank: number | null
+  value: number
+  activities: number
+  total: number
+  /**
+   * Présent seulement quand le lecteur est classé.
+   *
+   * C'est ce qui permet à l'interface de surligner sa ligne dans la liste sans
+   * avoir à deviner : `CurrentUser` ne porte pas la fiche club, et comparer
+   * sur le nom serait faux le jour où deux membres s'appellent pareil.
+   */
+  member?: {
+    uuid: string
+    full_name: string
+    initials: string
+    matricule: string
+    photo_url: string | null
+  }
+}
+
+export interface LeaderboardMeta {
+  period: LeaderboardPeriod
+  period_key: string
+  metric: ChallengeMetricCode
+  metric_label: string
+  unit: string
+  sport: SportCode | null
+  /**
+   * Ce classement est-il FIGÉ ?
+   *
+   * Une période close ne bouge plus ; une période en cours peut encore
+   * changer. Le membre qui regarde a le droit de savoir lequel des deux il a
+   * sous les yeux — et l'interface le lui dit.
+   */
+  frozen: boolean
+  me: MyRank | null
+}
+
+/** Un défi du club. */
+export interface Challenge {
+  uuid: string
+  title: string
+  description: string | null
+
+  metric: ChallengeMetricCode
+  metric_label: string
+  /** `m`, `s` ou `sorties`. */
+  unit: string
+  /** En unité SI. « 500 km » vaut 500000. */
+  target: number
+
+  sport: SportCode | null
+  sport_label: string | null
+
+  icon: string
+
+  starts_on: string
+  ends_on: string
+  days_left: number | null
+  is_running: boolean
+  accepts_entries: boolean
+
+  status: ChallengeStatusCode
+  status_label: string
+
+  participants: number
+  finishers: number
+
+  /**
+   * `null` quand le lecteur ne participe pas.
+   *
+   * Différent d'une progression à zéro, qui voudrait dire « inscrit, rien
+   * fait ». L'interface ne doit pas avoir à deviner.
+   */
+  my_progress: {
+    value: number
+    percent: number
+    completed_at: string | null
+    joined_at: string | null
+  } | null
+
+  created_by?: { uuid: string; name: string }
+
+  permissions: {
+    update: boolean
+    delete: boolean
+    join: boolean
+  } | null
+}
+
+/** Une ligne du classement d'un défi. */
+export interface ChallengeStanding {
+  rank: number
+  member: { uuid: string; full_name: string; initials: string; photo_url: string | null }
+  progress: number
+  percent: number
+  /** Non nul = a réussi le défi. Les finisseurs passent devant. */
+  completed_at: string | null
+}
+
+/**
+ * Un badge : un défi réellement réussi.
+ *
+ * Ce n'est pas une récompense inventée — c'est un défi avec ses règles, sa
+ * période et sa date de réussite. Une taxonomie de badges détachée des défis
+ * aurait demandé d'inventer des distinctions que le club n'a pas demandées.
+ */
+export interface Badge {
+  challenge: {
+    uuid: string
+    title: string
+    icon: string
+    metric: ChallengeMetricCode
+    target: number
+    unit: string
+  }
+  completed_at: string
+}
+
+export interface ChallengeInput {
+  title: string
+  description?: string | null
+  metric: ChallengeMetricCode
+  /** En unité SI. */
+  target: number
+  sport?: SportCode | null
+  starts_on: string
+  ends_on: string
+  icon?: string
+  status?: ChallengeStatusCode
+}
