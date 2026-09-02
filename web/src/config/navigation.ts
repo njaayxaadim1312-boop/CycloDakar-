@@ -7,6 +7,7 @@ import {
   FileBarChart,
   Footprints,
   Gauge,
+  LayoutDashboard,
   ListChecks,
   Play,
   Receipt,
@@ -67,11 +68,19 @@ export const DELIVERED_THROUGH_PHASE = 13
 
 export const navigation: NavSection[] = [
   {
-    title: 'Mon activité',
+    title: 'Le tableau de bord et mon sport',
     items: [
       {
         to: '/',
-        label: 'Accueil',
+        label: 'Tableau de bord',
+        icon: LayoutDashboard,
+        phase: 1,
+        summary:
+          "L'état du club en un écran : effectifs, activité, événements à venir, et — pour qui y a droit — la caisse et le reste à collecter.",
+      },
+      {
+        to: '/activite',
+        label: 'Mon activité',
         icon: Gauge,
         phase: 1,
         summary:

@@ -41,10 +41,17 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  * sa route. Les écrans réellement implémentés sont déclarés avant, et
  * prennent le pas sur l'écran d'attente.
  *
- * La RACINE est l'écran d'activité : anneaux de la semaine, dernières
- * sorties, prochaine sortie du club. Le tableau de bord du club, lui, vit sous
- * `/gestion/tableau-de-bord` — il est utile au bureau, mais ce n'est pas ce
- * qu'un membre vient chercher en ouvrant l'application.
+ * LA RACINE EST LE TABLEAU DE BORD DU CLUB, à la demande du bureau.
+ *
+ * C'est un revirement par rapport à l'organisation précédente, où la racine
+ * portait l'écran d'activité — anneaux de la semaine, dernières sorties — et
+ * où le tableau de bord vivait derrière « Gestion du club ». Ce choix-là
+ * partait d'une idée juste : ce qu'on voit en ouvrant une application dit ce
+ * qu'elle est. Le club a tranché autrement, et c'est sa décision.
+ *
+ * L'écran d'activité n'est pas perdu pour autant : il vit désormais sous
+ * `/activite`, en tête du menu, et reste ce qu'un membre vient chercher pour
+ * enregistrer une sortie.
  *
  * Écrans livrés à ce jour :
  *   PHASE 1  / (activite), /system
@@ -54,13 +61,15 @@ import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
  *   PHASE 7  /activities, /activities/:uuid
  *   PHASE 8  /stats
  *   PHASE 9  /events, /events/nouveau, /events/:uuid, /events/:uuid/modifier
- *   PHASE 9bis  / (activite), /gestion, /gestion/tableau-de-bord
+ *   PHASE 9bis  /activite, /gestion
+ *   PHASE 13bis / (tableau de bord)
  *   PHASE 10 /participations, /participations/nouvelle, /participations/:uuid
  */
 
 /** Routes déjà implémentées — elles ne doivent pas tomber sur PlaceholderPage. */
 const IMPLEMENTED = new Set([
   '/',
+  '/activite',
   '/gestion',
   '/record',
   '/participations',
@@ -70,6 +79,16 @@ const IMPLEMENTED = new Set([
   '/activities',
   '/stats',
   '/events',
+
+  // PHASE 12
+  '/payments',
+  '/mes-cotisations',
+  '/finance/collectes',
+
+  // PHASE 13
+  '/finance',
+  '/finance/expenses',
+  '/finance/transactions',
 ])
 
 export default function App() {
@@ -92,20 +111,23 @@ export default function App() {
       {/* --- Application, réservée aux comptes connectés ----------------- */}
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
-          {/* L'exercice d'abord : la racine est l'écran d'activité. */}
-          <Route path="/" element={<ActivityHomePage />} />
+          {/* La racine : le tableau de bord du club, à la demande du bureau.
+              C'est aussi là qu'atterrit une connexion réussie. */}
+          <Route path="/" element={<DashboardPage />} />
+
+          {/* L'écran d'exercice : anneaux de la semaine, dernières sorties,
+              prochaine sortie du club. */}
+          <Route path="/activite" element={<ActivityHomePage />} />
 
           {/* Tout ce qui touche à l'argent et à l'administration passe par
               une seule porte. */}
           <Route path="/gestion" element={<ManagementPage />} />
-          <Route path="/gestion/tableau-de-bord" element={<DashboardPage />} />
 
-          {/* Ancien chemin du tableau de bord : les liens déjà partagés et
-              les favoris du bureau doivent continuer de fonctionner. */}
-          <Route
-            path="/dashboard"
-            element={<Navigate to="/gestion/tableau-de-bord" replace />}
-          />
+          {/* Anciens chemins du tableau de bord. Les liens déjà partagés et
+              les favoris du bureau doivent continuer de fonctionner : une
+              réorganisation de menu ne doit jamais casser un signet. */}
+          <Route path="/gestion/tableau-de-bord" element={<Navigate to="/" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
           <Route path="/system" element={<SystemStatusPage />} />
           <Route path="/profile" element={<ProfilePage />} />

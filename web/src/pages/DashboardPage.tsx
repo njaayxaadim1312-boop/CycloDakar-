@@ -313,6 +313,16 @@ export function DashboardPage() {
           </article>
         )}
 
+        {/*
+          L'ÉTAT DES SERVICES NE S'AFFICHE QU'À L'ADMINISTRATION.
+
+          Depuis que cet écran est la page d'accueil, tout le club y passe en se
+          connectant. Une version de PHP et l'état de la base sont du
+          diagnostic, pas de l'information de club : au mieux du bruit, au pire
+          une inquiétude — « un service ne répond pas » alarme un membre qui n'y
+          peut rien. Le détail complet reste sous « État du système ».
+        */}
+        {user?.abilities.administer === true && (
         <article className="cd-card p-5">
           <h3 className="text-base font-bold">État des services</h3>
 
@@ -374,6 +384,7 @@ export function DashboardPage() {
             Diagnostic détaillé →
           </Link>
         </article>
+        )}
       </section>
     </div>
   )

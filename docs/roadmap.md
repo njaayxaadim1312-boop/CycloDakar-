@@ -619,6 +619,21 @@ Elle montre désormais un vrai montant, et l'engagé **à côté** — pas fondu
 dedans. Une tuile se lit vite, sans réfléchir : c'est précisément là qu'un total
 trop malin fait des dégâts.
 
+**Le tableau de bord devient la page d'accueil**
+
+À la demande du bureau, la connexion mène désormais au tableau de bord et non
+plus à l'écran d'exercice. C'est un revirement par rapport à la réorganisation
+« le sport devant » : ce qu'on voit en ouvrant une application dit ce qu'elle
+est, et le club a tranché autrement. L'écran d'exercice n'est pas perdu — il
+vit sous `/activite`, en deuxième entrée du menu — et les anciens liens vers
+`/gestion/tableau-de-bord` redirigent, pour ne casser aucun signet.
+
+Conséquence immédiate, corrigée dans la foulée : la carte « État des services »
+— version de PHP, état de la base — s'affichait à tous. Sur une page d'accueil
+que tout le club traverse, c'est du diagnostic hors sujet, et « un service ne
+répond pas » alarme un membre qui n'y peut rien. Elle est désormais réservée à
+l'administration ; le détail reste sous « État du système ».
+
 **Vérifié**
 
 396 tests backend (29 pour cette phase), 65 mobile. Les six écrans financiers
