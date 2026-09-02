@@ -27,6 +27,7 @@ final class MemberService
 {
     public function __construct(
         private readonly MatriculeGenerator $matricules,
+        private readonly ImageProcessor $images,
     ) {}
 
     /**
@@ -133,12 +134,21 @@ final class MemberService
         $disk = Storage::disk(config('cyclo.uploads.public_disk'));
         $previous = $member->photo_path;
 
-        // Nom régénéré : on n'utilise jamais celui fourni par le client.
-        $path = $photo->storeAs(
-            'members',
-            Str::uuid().'.'.$photo->extension(),
-            ['disk' => config('cyclo.uploads.public_disk')],
-        );
+        /*
+         | L'image est NETTOYÉE avant d'être écrite, pas stockée telle quelle.
+         |
+         | Une photo prise au téléphone porte dans son EXIF les coordonnées GPS
+         | du lieu de la prise de vue — souvent le domicile. Sur un disque
+         | public, à une URL devinable, cela reviendrait à publier l'adresse du
+         | membre. C'est exactement ce que `docs/risques.md` interdit pour les
+         | traces GPS, et une photo révèle la même chose.
+         |
+         | Le nom de fichier reste régénéré : on n'utilise jamais celui du
+         | client, qui peut contenir n'importe quoi.
+         */
+        $path = 'members/'.Str::uuid().'.'.$photo->extension();
+
+        $disk->put($path, $this->images->clean($photo, ImageProcessor::AVATAR));
 
         $member->forceFill(['photo_path' => $path])->save();
 
@@ -163,11 +173,12 @@ final class MemberService
         $disk = Storage::disk(config('cyclo.uploads.public_disk'));
         $previous = $member->cover_path;
 
-        $path = $cover->storeAs(
-            'covers',
-            Str::uuid().'.'.$cover->extension(),
-            ['disk' => config('cyclo.uploads.public_disk')],
-        );
+        // Même nettoyage que la photo : EXIF effacé, orientation appliquée,
+        // et réduction à une taille d'écran. Un fond d'écran de 4 000 pixels
+        // coûterait à chaque chargement sans rien apporter.
+        $path = 'covers/'.Str::uuid().'.'.$cover->extension();
+
+        $disk->put($path, $this->images->clean($cover, ImageProcessor::COVER));
 
         $member->forceFill(['cover_path' => $path])->save();
 

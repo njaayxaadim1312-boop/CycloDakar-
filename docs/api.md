@@ -1022,6 +1022,54 @@ coupé les alertes.
 
 ---
 
+## 3 sexies. Données personnelles et audit — phase 19
+
+### `GET /me/export` — tout membre
+
+Tout ce que le club détient sur le lecteur, en un fichier JSON téléchargeable :
+compte, fiche club, sorties **avec leur trace encodée**, cotisations, reçus,
+défis, notifications.
+
+**La route ne prend aucun identifiant.** On n'exporte que son propre compte : un
+paramètre `user` transformerait l'export RGPD en fuite de l'annuaire complet —
+tout y est, y compris les téléphones et les contacts d'urgence.
+
+### `DELETE /me` — tout membre
+
+```json
+{ "password": "…", "confirmation": "SUPPRIMER" }
+```
+
+Mot de passe **et** confirmation écrite en toutes lettres. C'est irréversible.
+
+| Effacé | Conservé, sans le nom |
+|---|---|
+| Sorties, points GPS, statistiques | Encaissements et écritures comptables |
+| Photo, fond d'écran | Le matricule (relie une écriture à une ligne) |
+| Téléphone, email, contact d'urgence | Le journal d'audit |
+| Notifications, appareils, sessions | |
+
+Le QR est révoqué : une carte imprimée ne doit plus rien ouvrir. Le compte part
+en suppression **douce** — `audit_logs.user_id` le référence, et un effacement
+franc ferait disparaître l'auteur d'opérations financières.
+
+La réponse détaille poste par poste ce qui a été fait : une suppression qui
+répondrait « c'est fait » laisserait le membre se demander si ses traces ont
+vraiment disparu.
+
+### `GET /audit-logs` · `GET /audit-logs/actions` — administration seulement
+
+Filtres : `action`, `entity_type`, `user` (uuid), `from`, `to`.
+
+**Le trésorier n'y a pas accès** : il est la personne que ce journal surveille.
+C'est déjà ce que dit le tableau des droits de [finance.md](finance.md), où
+« voir les journaux d'audit » est la seule ligne où il a un refus.
+
+En **lecture seule**. Il n'existe aucune route pour écrire, modifier ou effacer
+une ligne d'audit, et il ne doit jamais en exister.
+
+---
+
 ## 4. Contrôle par rôle
 
 Six rôles, du moins au plus étendu :

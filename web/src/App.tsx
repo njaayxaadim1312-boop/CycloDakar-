@@ -12,6 +12,7 @@ import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { CashPage } from '@/pages/finance/CashPage'
 import { ExpensesPage } from '@/pages/finance/ExpensesPage'
 import { LedgerPage } from '@/pages/finance/LedgerPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
 import { ChallengesPage } from '@/pages/community/ChallengesPage'
 import { LeaderboardPage } from '@/pages/community/LeaderboardPage'
 import { ReportsPage } from '@/pages/finance/ReportsPage'
@@ -99,6 +100,9 @@ const IMPLEMENTED = new Set([
   // PHASE 16
   '/leaderboard',
   '/challenges',
+
+  // PHASE 19
+  '/audit-logs',
 ])
 
 export default function App() {
@@ -182,6 +186,11 @@ export default function App() {
               auteur : la regle vit cote serveur, en un seul endroit. */}
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/challenges" element={<ChallengesPage />} />
+
+          {/* Journal d'audit — PHASE 19. En lecture seule, administration
+              seulement : le tresorier est la personne que ce journal
+              surveille. */}
+          <Route path="/audit-logs" element={<AuditLogPage />} />
 
           <Route path="/participations" element={<ParticipationsPage />} />
           <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />

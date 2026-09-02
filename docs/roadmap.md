@@ -1023,10 +1023,95 @@ dix écrans et le parcours de connexion.
 
 ---
 
-## ⏳ Phase 19 — Sécurité et documentation d'API
+## ✅ Phase 19 — Sécurité et données personnelles *(terminée, sauf OpenAPI)*
 
-Audit des permissions, durcissement des uploads, schéma OpenAPI + Swagger UI,
-journaux d'audit consultables, conformité RGPD (export et suppression de compte).
+**L'audit des permissions est fait par la machine.**
+
+Une relecture à l'œil protège mal : les routes sont soixante-dix et grossissent
+à chaque phase. Le test énumère celles qui sont réellement enregistrées et
+vérifie que chacune exige une session, contrôle que le compte est actif, et
+n'expose aucune clé primaire interne — un identifiant séquentiel se devine, et
+`/members/1`, `/members/2`… permettrait d'énumérer l'annuaire.
+
+Il se garde lui-même : il échoue s'il voit moins de soixante routes, sinon un
+préfixe renommé le ferait passer sans rien vérifier.
+
+Résultat : **aucune route n'était ouverte par erreur.** L'audit n'a rien trouvé,
+et c'est un résultat — désormais vérifié à chaque exécution plutôt que cru sur
+parole.
+
+**Un trou réel : l'EXIF des photos**
+
+Une photo prise au téléphone porte les coordonnées GPS du lieu de la prise de
+vue. Un membre qui envoie sa photo de profil prise chez lui publiait donc son
+adresse, sur un disque public, sans jamais l'avoir su. C'est exactement ce que
+`docs/risques.md` interdit pour les traces GPS.
+
+L'effacement se fait par **ré-encodage** : GD ne recopie aucune métadonnée, si
+bien que l'image sortante ne porte que des pixels. Une liste de champs à effacer
+finirait par en oublier un.
+
+Le piège était l'**orientation** : un téléphone note « tourne-la de 90° avant
+d'afficher » dans l'EXIF, et l'effacer sans appliquer cette rotation d'abord
+ferait sortir toutes les photos verticales couchées. L'extension `exif` a dû
+être activée sur le serveur pour cela.
+
+Au passage, les images sont réduites à 1 024 px (photo) ou 1 920 px (fond) :
+servir huit mégaoctets pour un avatar de 72 pixels, sur des forfaits mobiles
+sénégalais, est un gaspillage que le club paie deux fois.
+
+**Le RGPD, avec sa ligne de partage assumée**
+
+Un membre peut emporter tout ce que le club détient sur lui — compte, fiche,
+sorties avec leur trace, cotisations, reçus, défis, notifications.
+
+Il peut faire effacer ce qui ne concerne que lui. Il ne peut pas faire effacer
+les écritures comptables auxquelles il a participé : elles engagent la caisse du
+club et figurent dans des rapports peut-être déjà présentés en assemblée. Elles
+sont donc **anonymisées** — le montant reste, le nom disparaît.
+
+**L'écran le dit avant de demander confirmation**, pas après. Le découvrir après
+coup ferait croire à un mensonge ; le dire avant, c'est le respect qu'on doit à
+quelqu'un qui s'en va.
+
+La suppression exige le mot de passe **et** le mot « SUPPRIMER » tapé en toutes
+lettres : c'est le seul endroit de l'application où un téléphone laissé
+déverrouillé sur une table permettrait de détruire un compte en deux appuis.
+
+**Le journal d'audit, enfin lisible**
+
+Il existait depuis la phase 3 et personne n'avait jamais pu le lire — il fallait
+ouvrir la base. Un journal qu'on ne peut pas lire ne protège personne : il donne
+le sentiment d'être protégé, ce qui est pire, car on renonce alors à d'autres
+contrôles.
+
+Administration seulement. **Le trésorier n'y a pas accès : il est la personne que
+ce journal surveille.** En lecture seule, sans aucune route d'écriture — un
+journal qu'on peut retoucher ne prouve rien.
+
+**Ce qui n'est PAS livré : le schéma OpenAPI**
+
+La roadmap le demandait. Il n'est pas fait, et je préfère le dire que cocher la
+case.
+
+`docs/api.md` documente déjà chaque route livrée, avec ses paramètres, ses codes
+d'erreur et — surtout — les raisons de ses choix, ce qu'un schéma généré ne
+porterait pas. Ajouter une seconde description, générée automatiquement, créerait
+une source de vérité de plus à tenir d'accord avec la première : exactement le
+problème que les fichiers miroirs ont déjà posé deux fois dans ce projet.
+
+Un OpenAPI a du sens le jour où un client TIERS consomme l'API. Aujourd'hui les
+deux seuls clients sont dans ce dépôt et partagent leurs types TypeScript. Le
+faire maintenant serait de la machinerie sans besoin mesuré — à reprendre en
+phase 20 si le club ouvre son API.
+
+**Vérifié**
+
+484 tests backend (19 pour cette phase), et douze écrans rendus dans un vrai
+Chrome. Le harnais de rendu a d'ailleurs été corrigé au passage : il attendait
+un délai fixe, et se mettait à échouer le jour où un écran avait vraiment
+quelque chose à afficher — le rapport financier l'a fait tomber. Il attend
+maintenant la fin du chargement.
 
 ---
 

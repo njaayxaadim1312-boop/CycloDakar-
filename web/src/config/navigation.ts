@@ -60,7 +60,7 @@ const FINANCE: RoleCode[] = ['TREASURER', 'ADMIN', 'SUPER_ADMIN']
 const COLLECT: RoleCode[] = ['COLLECTOR', 'TREASURER', 'ADMIN', 'SUPER_ADMIN']
 
 /** Dernière phase effectivement livrée — à incrémenter à chaque phase finie. */
-export const DELIVERED_THROUGH_PHASE = 17
+export const DELIVERED_THROUGH_PHASE = 19
 
 /* -------------------------------------------------------------------------- */
 /* Menu principal — l'exercice, et rien d'autre                               */
@@ -276,7 +276,7 @@ export const managementSections: NavSection[] = [
         phase: 19,
         roles: ADMIN,
         summary:
-          'Traçabilité complète : qui a fait quoi, quand, sur quelle entité, avec les valeurs avant et après.',
+          "Qui a fait quoi, quand, et ce que valait la donnée avant. En lecture seule — un journal qu'on peut retoucher ne prouve rien.",
       },
       {
         to: '/system',

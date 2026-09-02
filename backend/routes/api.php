@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordResetController;
 use App\Http\Controllers\Api\V1\ActivityController;
+use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\ChallengeController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\EventController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PersonalDataController;
 use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
 
@@ -461,6 +463,50 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | notifier » : pas de jeton, pas de push. Les notifications EN BASE,
         | elles, continuent d'arriver — elles ne reveillent personne.
         */
+        /*
+        |----------------------------------------------------------------------
+        | Journal d'audit — PHASE 19
+        |----------------------------------------------------------------------
+        |
+        | EN LECTURE SEULE, ET RESERVE A L'ADMINISTRATION.
+        |
+        | Il n'existe aucune route pour ecrire, modifier ou effacer une ligne
+        | d'audit, et il ne doit jamais en exister : un journal qu'on peut
+        | retoucher ne prouve rien.
+        |
+        | Le tresorier lui-meme n'y a pas acces — il est la personne que ce
+        | journal surveille. C'est deja ce que dit le tableau des droits de
+        | docs/finance.md, ou « voir les journaux d'audit » est la seule ligne
+        | ou le tresorier a un refus.
+        */
+        Route::prefix('audit-logs')->name('audit-logs.')->group(function (): void {
+            Route::get('/', [AuditLogController::class, 'index'])->name('index');
+            Route::get('/actions', [AuditLogController::class, 'actions'])->name('actions');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Donnees personnelles — PHASE 19 (RGPD)
+        |----------------------------------------------------------------------
+        |
+        | AUCUNE DE CES ROUTES NE PREND D'IDENTIFIANT. On n'exporte et on
+        | n'efface que SON PROPRE compte : ces reponses portent les traces GPS,
+        | les telephones et les contacts d'urgence. Un parametre `user`
+        | transformerait l'export RGPD en fuite de l'annuaire complet.
+        |
+        | Meme un administrateur ne peut pas effacer un autre compte par ici.
+        | Radier un membre est un autre geste, qui passe par l'annuaire, laisse
+        | la fiche en place et se trace au journal d'audit.
+        |
+        | La suppression demande le MOT DE PASSE et une confirmation ecrite :
+        | c'est irreversible, et c'est le seul endroit ou un telephone laisse
+        | deverrouille permettrait de detruire un compte en deux appuis.
+        */
+        Route::get('/me/export', [PersonalDataController::class, 'export'])
+            ->name('me.export');
+        Route::delete('/me', [PersonalDataController::class, 'destroy'])
+            ->name('me.destroy');
+
         Route::prefix('notifications')->name('notifications.')->group(function (): void {
             Route::get('/', [NotificationController::class, 'index'])->name('index');
             Route::get('/unread-count', [NotificationController::class, 'unreadCount'])

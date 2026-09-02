@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/StatusBadge'
 import { useTheme, type ThemeChoice } from '@/hooks/useTheme'
 import { CoverPicker } from '@/components/members/CoverPicker'
+import { PersonalDataSection } from '@/components/members/PersonalDataSection'
 import { API_URL, ApiError, postData } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { fetchMyMember, rotateQrCode } from '@/lib/members'
@@ -414,6 +415,12 @@ function Info({ label, value }: { label: string; value: string }) {
         {label}
       </dt>
       <dd className="mt-0.5 font-semibold">{value}</dd>
+      {/* --- Mes donnees ---------------------------------------------------
+          En DERNIER, et c'est voulu : c'est la section qu'on ne cherche qu'une
+          fois, et la placer plus haut mettrait « supprimer mon compte » sous
+          les yeux de quelqu'un qui venait changer son mot de passe. */}
+      <PersonalDataSection />
+
     </div>
   )
 }

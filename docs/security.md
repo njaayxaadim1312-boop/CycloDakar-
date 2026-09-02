@@ -14,7 +14,22 @@
   Les deux compteurs sont nécessaires : le premier freine le bourrinage d'un compte,
   le second empêche un attaquant de verrouiller le compte d'un membre à sa place.
 
-## 2. Autorisations (RBAC)
+## 2. Autorisations (RBAC) ✅
+
+**L'audit des permissions est fait par la machine, pas à l'œil.**
+`tests/Feature/Security/RouteProtectionTest.php` énumère les routes réellement
+enregistrées et vérifie que chacune exige une session, contrôle que le compte
+est actif, et n'expose aucune clé primaire interne. Une liste blanche courte,
+justifiée entrée par entrée, porte les seules exceptions.
+
+Une relecture à l'œil protège mal : les routes sont soixante-dix, elles
+grossissent à chaque phase, et il suffit d'en écrire une hors du bon groupe pour
+l'ouvrir à tout internet. C'est le genre d'erreur qu'on ne voit pas dans son
+propre code, parce qu'on sait ce qu'on a voulu écrire.
+
+Le test se garde lui-même : il échoue s'il voit moins de soixante routes, sinon
+un préfixe renommé le ferait passer sans rien vérifier.
+
 
 Six rôles : `MEMBER`, `RIDE_LEADER`, `COLLECTOR`, `TREASURER`, `ADMIN`,
 `SUPER_ADMIN`.
@@ -61,10 +76,35 @@ Erreurs renvoyées en 422 avec le détail par champ, en français. ✅
 | Types document | `application/pdf` |
 | Vérification | **contenu réel** du fichier, jamais l'extension ni l'en-tête client |
 | Nom de fichier | régénéré (UUID) — jamais celui fourni par le client |
+| Métadonnées | **EXIF effacé** par ré-encodage, orientation appliquée d'abord |
+| Dimensions | réduites à 1 024 px (photo) ou 1 920 px (fond d'écran) |
 
 Les **justificatifs financiers** sont stockés **hors de `public/`** et servis
-uniquement par une route signée à durée limitée. Une facture ne doit pas être
-accessible en devinant une URL.
+uniquement par une route contrôlée. Une facture ne doit pas être accessible en
+devinant une URL.
+
+### L'EXIF est effacé, et ce n'est pas un détail ✅
+
+**Une photo prise au téléphone porte les coordonnées GPS du lieu de la prise de
+vue.** Invisibles à l'œil, lisibles par n'importe quel outil en deux secondes.
+Un membre qui envoie sa photo de profil prise chez lui publierait donc son
+adresse, sur un disque public, sans jamais l'avoir su.
+
+C'est exactement ce que le §10 interdit pour les traces GPS : une photo révèle
+la même chose, en un point au lieu d'une trace.
+
+L'effacement se fait par **ré-encodage** et non par suppression de champs : GD
+ne recopie aucune métadonnée, si bien que l'image sortante ne porte que des
+pixels. Une liste de champs à effacer, elle, finirait par en oublier un.
+
+**Le piège : l'orientation.** Un téléphone n'écrit pas l'image tournée ; il note
+dans l'EXIF « tourne-la de 90° avant d'afficher ». Effacer sans appliquer cette
+rotation d'abord ferait sortir toutes les photos verticales couchées. On applique
+donc l'orientation, puis on ré-encode.
+
+Le test fabrique un JPEG portant un **segment EXIF GPS réellement conforme** —
+décalages TIFF calculés, pas devinés — et vérifie qu'il est lisible AVANT
+traitement. Sans cette garde, le test prouverait qu'on sait effacer… rien.
 
 ## 6. Limitation de débit ✅
 
@@ -85,10 +125,20 @@ Signés en **HMAC-SHA256** avec un secret partagé, horodatage inclus dans la ba
 signée (anti-rejeu, fenêtre de 5 min), comparaison à **temps constant**.
 Node n'a **aucun** accès à la base de données.
 
-## 9. Audit
+## 9. Audit ✅
 
 `audit_logs` enregistre toute opération financière et administrative : auteur,
 action, entité, valeurs avant/après, motif, IP, agent utilisateur, horodatage.
+
+**Consultable depuis la phase 19**, à `/audit-logs` — administration seulement.
+Il existait depuis la phase 3 sans que personne puisse le lire, ce qui est pire
+qu'une absence : on renonce à d'autres contrôles en croyant celui-là actif.
+
+Le **trésorier n'y a pas accès** : il est la personne que ce journal surveille.
+
+**En lecture seule.** Il n'existe aucune route pour écrire, modifier ou effacer
+une ligne, et il ne doit jamais en exister : un journal qu'on peut retoucher ne
+prouve rien.
 
 Aucune opération financière validée ne peut être supprimée : la correction se fait
 par contre-passation. Voir [finance.md](finance.md), invariant I2.
@@ -100,10 +150,33 @@ horaires et ses habitudes.
 
 - **Consentement explicite** avant toute capture, avec explication en français.
 - **Visibilité par activité** : `PRIVATE` (par défaut), `CLUB`, `PUBLIC`.
-- **Export** de ses propres données (GPX, JSON).
-- **Suppression de compte** avec effacement des activités et des points GPS.
-  Les écritures financières, elles, sont **anonymisées** et non supprimées : elles
-  engagent la comptabilité du club, pas seulement le membre.
+- **Export** de ses propres données — `GET /me/export` ✅. Tout y est : compte,
+  fiche, sorties avec leur trace encodée, cotisations, reçus, défis,
+  notifications. Un export qui ne donnerait que des résumés ne permettrait pas
+  de reprendre ses données ailleurs.
+- **Suppression de compte** — `DELETE /me` ✅. Mot de passe **et** confirmation
+  écrite (« SUPPRIMER » en toutes lettres) : c'est irréversible, et c'est le seul
+  endroit où un téléphone laissé déverrouillé permettrait de détruire un compte
+  en deux appuis.
+
+  Ce qui part : sorties, points GPS, statistiques, photo, fond d'écran,
+  téléphone, contact d'urgence, notifications, appareils. Le QR est révoqué —
+  une carte imprimée ne doit plus rien ouvrir.
+
+  Ce qui reste, **sans le nom** : les écritures comptables. Elles engagent la
+  caisse du club et figurent dans des rapports peut-être déjà présentés en
+  assemblée ; les effacer les rendrait faux, et la règle I2 l'interdit de toute
+  façon. La fiche est donc anonymisée plutôt que supprimée — le matricule
+  survit, car il relie une écriture à une ligne sans rien dire de la personne.
+
+  Le compte lui-même part en **suppression douce** : `audit_logs.user_id` le
+  référence, et un effacement franc ferait disparaître l'auteur d'opérations
+  financières. Le journal ne dirait plus qui a fait quoi — or c'est précisément
+  le document qu'on consulte quand quelque chose cloche. L'identité, elle, est
+  bien effacée.
+
+  **L'écran dit tout cela AVANT de demander confirmation.** Le découvrir après
+  coup ferait croire à un mensonge.
 - Aucune position n'est transmise à un tiers. Le reverse-geocoding n'envoie à
   Nominatim que des **centres de cellules de 2 km**, jamais la trace.
 

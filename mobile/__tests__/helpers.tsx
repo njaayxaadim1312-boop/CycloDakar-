@@ -102,6 +102,7 @@ export const aMember = (overrides: Partial<Member> = {}): Member => ({
   full_name: 'Khadim Ndiaye',
   initials: 'KN',
   photo_url: null,
+  cover_url: null,
   status: 'ACTIVE',
   status_label: 'Actif',
   joined_at: '2024-03-01',
