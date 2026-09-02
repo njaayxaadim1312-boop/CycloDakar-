@@ -1,8 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, Pause, Play, Square, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError } from '@/lib/api'
 import {
   formatDistance,
   formatDuration,
@@ -10,38 +9,9 @@ import {
   formatPace,
   formatSpeed,
 } from '@/lib/format'
-import {
-  EMPTY_STATS,
-  RecordingSession,
-  type LiveStats,
-} from '@/lib/recording'
 import { SPORTS, SPORT_COLOR, SPORT_ICON, SPORT_LABEL, sportTint } from '@/lib/sports'
+import { useRecording } from '@/stores/recording'
 import type { SportCode } from '@/types/api'
-
-/**
- * Cadence de rafraîchissement de l'affichage, en millisecondes.
- *
- * Deux fois par seconde : la durée avance sans à-coup et la vitesse suit le
- * geste. Ce n'est PAS la cadence du GPS — le navigateur livre une position
- * quand il en a une, on ne la commande pas.
- */
-const DISPLAY_INTERVAL_MS = 500
-
-/**
- * Cadence d'envoi des points au serveur, en millisecondes.
- *
- * Volontairement bien plus lente que l'affichage : envoyer toutes les demi-
- * secondes ferait 7 200 requêtes sur une sortie de deux heures, viderait la
- * batterie et le forfait, et n'apporterait rien — les points sont numérotés
- * et l'envoi est reprenable, donc rien ne se perd entre deux lots.
- *
- * 10 s est le compromis : au pire, une fermeture brutale du navigateur coûte
- * dix secondes de trace, que le serveur signalera comme manquantes à la
- * finalisation.
- */
-const UPLOAD_INTERVAL_MS = 10_000
-
-type Phase = 'choix' | 'demarrage' | 'course' | 'fin'
 
 /** Motifs de rejet, expliqués au membre plutôt qu'affichés en code. */
 const REJECTION_LABEL: Record<string, string> = {
@@ -69,208 +39,94 @@ export function RecordPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const [phase, setPhase] = useState<Phase>('choix')
-  const [sport, setSport] = useState<SportCode>('CYCLING')
-  const [stats, setStats] = useState<LiveStats>(EMPTY_STATS)
-  const [paused, setPaused] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [interrupted, setInterrupted] = useState(false)
+  /*
+   | TOUT L'ÉTAT DE L'ENREGISTREMENT VIT DANS LE MAGASIN, PAS ICI.
+   |
+   | Il vivait dans cette page : la session, le suivi GPS et les minuteries
+   | étaient des `useRef` du composant, et un effet les relâchait au
+   | démontage. Toucher n'importe quel bouton de navigation coupait donc le
+   | GPS en silence, et la sortie s'arrêtait là.
+   |
+   | Ce n'était pas un défaut de nettoyage — le nettoyage faisait ce qu'on lui
+   | demandait. C'était un défaut de propriété : une chose qui doit survivre à
+   | l'affichage ne peut pas appartenir à l'affichage.
+   |
+   | Cette page n'est plus qu'une VUE. La quitter ne relâche plus rien.
+   */
+  const phase = useRecording((etat) => etat.phase)
+  const sport = useRecording((etat) => etat.sport)
+  const stats = useRecording((etat) => etat.stats)
+  const paused = useRecording((etat) => etat.paused)
+  const interrupted = useRecording((etat) => etat.interrupted)
+  const error = useRecording((etat) => etat.error)
+  const orpheline = useRecording((etat) => etat.orpheline)
+
+  const {
+    choisirSport,
+    demarrer,
+    basculerPause,
+    arreter,
+    enregistrer,
+    abandonner,
+    chercherOrpheline,
+    terminerOrpheline,
+    oublierOrpheline,
+  } = useRecording.getState()
+
   const [title, setTitle] = useState('')
 
-  const session = useRef<RecordingSession | null>(null)
-  const watchId = useRef<number | null>(null)
-  const wakeLock = useRef<WakeLockSentinel | null>(null)
-
-  /* ------------------------------------------------------------ arrêt --- */
-
-  const stopWatching = useCallback(() => {
-    if (watchId.current !== null) {
-      navigator.geolocation.clearWatch(watchId.current)
-      watchId.current = null
-    }
-
-    void wakeLock.current?.release().catch(() => undefined)
-    wakeLock.current = null
-  }, [])
-
-  // Filet de sécurité : quitter la page pendant une sortie relâcherait le
-  // GPS sans que rien ne l'arrête proprement.
-  useEffect(() => stopWatching, [stopWatching])
-
-  /* ---------------------------------------------------- horloge d'affichage */
-
-  useEffect(() => {
-    if (phase !== 'course') return
-
-    /*
-     * Rafraichissement toutes les 500 ms.
-     *
-     * Le navigateur livre une position quand il en a une — on ne commande
-     * pas sa cadence. Mais l'affichage, lui, se recalcule deux fois par
-     * seconde : la duree avance sans a-coup, et la vitesse suit le geste au
-     * lieu de sembler en retard d'une seconde.
-     */
-    const timer = window.setInterval(() => {
-      const current = session.current
-
-      if (current !== null) {
-        setStats(current.snapshot())
-      }
-    }, DISPLAY_INTERVAL_MS)
-
-    return () => window.clearInterval(timer)
-  }, [phase])
-
-  /* --------------------------------------------- envoi périodique des points */
-
-  useEffect(() => {
-    if (phase !== 'course') return
-
-    const timer = window.setInterval(() => {
-      void session.current?.flush().catch(() => undefined)
-    }, UPLOAD_INTERVAL_MS)
-
-    return () => window.clearInterval(timer)
-  }, [phase])
-
-  /* ------------------------------------------- détection des interruptions */
-
-  useEffect(() => {
-    if (phase !== 'course') return
-
-    const onHidden = () => {
-      if (document.hidden) {
-        // On ne prétend pas continuer : le navigateur va cesser de nous
-        // livrer des positions, et la trace aura un trou.
-        setInterrupted(true)
-      }
-    }
-
-    document.addEventListener('visibilitychange', onHidden)
-
-    return () => document.removeEventListener('visibilitychange', onHidden)
-  }, [phase])
-
-  /* ------------------------------------------------------------ démarrage */
-
-  async function start() {
-    if (!('geolocation' in navigator)) {
-      setError("Ce navigateur ne donne pas accès à la position.")
-
-      return
-    }
-
-    setError(null)
-    setPhase('demarrage')
-
-    const created = new RecordingSession(sport)
-
-    try {
-      await created.open()
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "Impossible d'ouvrir la sortie. Vérifiez votre connexion.",
-      )
-      setPhase('choix')
-
-      return
-    }
-
-    session.current = created
-
-    // Le verrou d'écran empêche la mise en veille. Il n'existe pas partout
-    // (Safari iOS l'a depuis peu, certains navigateurs pas du tout) : son
-    // absence ne doit pas empêcher d'enregistrer.
-    try {
-      wakeLock.current = await navigator.wakeLock?.request('screen')
-    } catch {
-      wakeLock.current = null
-    }
-
-    watchId.current = navigator.geolocation.watchPosition(
-      (position) => {
-        created.push(position)
-        setStats(created.snapshot())
-      },
-      (geoError) => {
-        setError(
-          geoError.code === geoError.PERMISSION_DENIED
-            ? "Position refusée. Autorisez la localisation pour ce site, puis réessayez."
-            : 'Position indisponible pour le moment.',
-        )
-      },
-      {
-        // Le GPS réel, pas la triangulation réseau : sans cela, la précision
-        // tourne autour de 1 km et le filtre rejette tout.
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20_000,
-      },
-    )
-
-    setPhase('course')
-  }
-
-  function togglePause() {
-    const current = session.current
-    if (current === null) return
-
-    if (current.isPaused) {
-      current.resume()
-      setPaused(false)
-    } else {
-      current.pause()
-      setPaused(true)
-    }
-  }
-
-  async function stop() {
-    stopWatching()
-    setPhase('fin')
-  }
+  // Une sortie laissée ouverte par un rechargement de page : on la cherche à
+  // l'ouverture de cet écran, jamais pendant qu'on enregistre.
+  useEffect(() => chercherOrpheline(), [chercherOrpheline])
 
   async function save() {
-    const current = session.current
-    if (current === null) return
+    const uuid = await enregistrer(title)
 
-    setError(null)
-
-    try {
-      const uuid = await current.finalize(title)
-
+    if (uuid !== null) {
       void queryClient.invalidateQueries({ queryKey: ['stats'] })
       void queryClient.invalidateQueries({ queryKey: ['activities'] })
 
+      setTitle('')
       navigate(`/activities/${uuid}`)
-    } catch (caught) {
-      setError(
-        caught instanceof ApiError
-          ? caught.message
-          : "L'enregistrement a échoué. Réessayez : rien n'est perdu.",
-      )
     }
   }
 
   async function discard() {
-    await session.current?.discard().catch(() => undefined)
-    session.current = null
-
+    await abandonner()
+    setTitle('')
     navigate('/')
+  }
+
+  async function terminerLaPrecedente() {
+    const uuid = await terminerOrpheline()
+
+    if (uuid !== null) {
+      void queryClient.invalidateQueries({ queryKey: ['activities'] })
+      navigate(`/activities/${uuid}`)
+    }
   }
 
   /* --------------------------------------------------------------- rendu */
 
-  if (phase === 'choix' || phase === 'demarrage') {
+  if (phase === 'inactif' || phase === 'demarrage') {
     return (
-      <SportChooser
-        sport={sport}
-        onSelect={setSport}
-        onStart={start}
-        starting={phase === 'demarrage'}
-        error={error}
-      />
+      <>
+        {orpheline !== null && (
+          <SortieRestee
+            debutMs={orpheline.debutMs}
+            onTerminer={terminerLaPrecedente}
+            onEffacer={() => void oublierOrpheline()}
+          />
+        )}
+
+        <SportChooser
+          sport={sport}
+          onSelect={choisirSport}
+          onStart={() => void demarrer()}
+          starting={phase === 'demarrage'}
+          error={error}
+        />
+      </>
     )
   }
 
@@ -356,7 +212,7 @@ export function RecordPage() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={togglePause}
+            onClick={basculerPause}
             className="flex min-h-[72px] items-center justify-center gap-2 rounded-[var(--cd-radius-pill)] border border-[var(--cd-border-strong)] text-lg font-bold transition-colors hover:border-[var(--cd-orange)]"
           >
             {paused ? <Play size={22} /> : <Pause size={22} />}
@@ -365,7 +221,7 @@ export function RecordPage() {
 
           <button
             type="button"
-            onClick={stop}
+            onClick={arreter}
             className="flex min-h-[72px] items-center justify-center gap-2 rounded-[var(--cd-radius-pill)] bg-[var(--cd-black)] text-lg font-bold text-white transition-opacity hover:opacity-90"
           >
             <Square size={20} fill="currentColor" />
@@ -396,7 +252,7 @@ export function RecordPage() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={save}
+              onClick={() => void save()}
               className="flex items-center gap-2 rounded-[var(--cd-radius-pill)] bg-[var(--cd-orange)] px-6 py-3 font-bold text-[var(--cd-black)] transition-colors hover:bg-[var(--cd-orange-hover)]"
             >
               <Check size={18} />
@@ -405,7 +261,7 @@ export function RecordPage() {
 
             <button
               type="button"
-              onClick={discard}
+              onClick={() => void discard()}
               className="rounded-[var(--cd-radius-pill)] border border-[var(--cd-border)] px-6 py-3 font-medium transition-colors hover:border-[var(--cd-danger)] hover:text-[var(--cd-danger)]"
             >
               Abandonner
@@ -520,5 +376,66 @@ function Metric({
         {value}
       </p>
     </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Une sortie laissée ouverte par un rechargement de page.
+ *
+ * Le magasin survit à la navigation, pas à un rechargement : la mémoire de
+ * l'onglet repart à zéro alors que la sortie reste ouverte côté serveur. Sans
+ * cet écran, elle y resterait indéfiniment et le membre n'en saurait rien.
+ *
+ * ON NE PROPOSE PAS DE « REPRENDRE ». Les points non encore envoyés — au pire
+ * les dix dernières secondes — sont perdus avec l'onglet, et rien ne peut les
+ * retrouver. Reprendre donnerait une trace avec un trou silencieux au milieu ;
+ * terminer avec ce que le serveur détient est la seule issue honnête.
+ */
+function SortieRestee({
+  debutMs,
+  onTerminer,
+  onEffacer,
+}: {
+  debutMs: number
+  onTerminer: () => void
+  onEffacer: () => void
+}) {
+  const debut = new Date(debutMs)
+
+  return (
+    <section className="cd-rise mx-auto mb-5 max-w-lg rounded-[var(--cd-radius-lg)] border border-[var(--cd-warning)] bg-[var(--cd-warning-soft)] p-5">
+      <p className="flex items-start gap-2 text-sm font-semibold text-[var(--cd-warning)]">
+        <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+        Une sortie démarrée à {debut.toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })} n’a pas été terminée.
+      </p>
+
+      <p className="mt-2 text-sm text-[var(--cd-text-muted)]">
+        La page a été rechargée pendant l’enregistrement. Le club a déjà reçu la
+        trace jusqu’aux dernières secondes ; le reste est perdu avec l’onglet.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={onTerminer}
+          className="rounded-[var(--cd-radius-pill)] bg-[var(--cd-orange)] px-5 py-2.5 text-sm font-bold text-[var(--cd-black)] transition-colors hover:bg-[var(--cd-orange-hover)]"
+        >
+          Terminer cette sortie
+        </button>
+
+        <button
+          type="button"
+          onClick={onEffacer}
+          className="rounded-[var(--cd-radius-pill)] border border-[var(--cd-border)] px-5 py-2.5 text-sm font-medium transition-colors hover:border-[var(--cd-danger)] hover:text-[var(--cd-danger)]"
+        >
+          L’effacer
+        </button>
+      </div>
+    </section>
   )
 }

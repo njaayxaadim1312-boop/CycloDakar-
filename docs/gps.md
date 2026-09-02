@@ -206,6 +206,45 @@ L'écran en tient compte plutôt que de la masquer :
 - Il **signale l'interruption** dès que la page passe en arrière-plan, pour que
   le membre sache que sa trace aura un trou.
 
+### La sortie n'appartient pas à l'écran qui l'affiche
+
+Signalement d'un membre : « quand je démarre une activité, si je clique sur un
+autre bouton ou je quitte, ça coupe l'activité ».
+
+C'était exact. La session, le suivi GPS et les minuteries étaient des `useRef`
+de `RecordPage`, relâchés par un effet au démontage. Toucher n'importe quel
+bouton de navigation démontait la page — et **coupait le GPS en silence**.
+
+Ce n'était pas un défaut de nettoyage : le nettoyage faisait exactement ce qu'on
+lui demandait. C'était un défaut de **propriété**. Une chose qui doit survivre à
+l'affichage ne peut pas appartenir à l'affichage.
+
+Tout cela vit désormais dans `web/src/stores/recording.ts`, à la portée du
+module, hors de React. La page n'est plus qu'une vue : la quitter ne relâche
+plus rien.
+
+**Le bandeau est la contrepartie indispensable.** Un enregistrement qui continue
+en coulisse sans rien montrer serait un défaut plus sournois que le premier : le
+membre croirait l'avoir arrêté en changeant de page, laisserait tourner le GPS
+des heures, et découvrirait une sortie de quarante kilomètres dont trente-huit
+en voiture. Le bandeau dit donc trois choses depuis n'importe quel écran — que
+ça enregistre, depuis combien de temps, et comment y retourner.
+
+**Fermer l'onglet demande confirmation.** C'est le seul geste qui coûte
+réellement quelque chose : les points non encore envoyés, au pire dix secondes.
+
+**Un rechargement de page reste une rupture**, et on ne prétend pas le
+contraire. La mémoire de l'onglet repart à zéro alors que la sortie reste
+ouverte côté serveur. Une marque dans le navigateur permet de la retrouver et
+propose deux issues : la **terminer** avec ce que le serveur a reçu, ou
+l'**effacer**. On ne propose pas de « reprendre » : les points perdus le sont
+définitivement, et reprendre donnerait une trace avec un trou silencieux au
+milieu.
+
+Vérifié dans un vrai Chrome, sur le déploiement : sortie démarrée à 100 m, clic
+sur le menu, déplacement pendant qu'un autre écran est affiché, bandeau à 250 m,
+retour à l'écran de suivi à 250 m.
+
 Le filtre est le **même fichier** que sur mobile (`web/src/lib/gps.ts`, miroir
 de `mobile/src/lib/gps.ts`). Ce n'est pas de la commodité : un point accepté
 d'un côté et rejeté de l'autre donnerait deux distances pour la même sortie.

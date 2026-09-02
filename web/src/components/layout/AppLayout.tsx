@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { findNavItem, isDelivered } from '@/config/navigation'
 import { Header } from './Header'
+import { RecordingBanner } from './RecordingBanner'
 import { Sidebar } from './Sidebar'
 
 /**
@@ -58,6 +59,10 @@ export function AppLayout() {
           }
           onOpenMenu={() => setMenuOpen(true)}
         />
+
+        {/* Sous l'en-tete, au-dessus du contenu : un enregistrement qui
+            continue en coulisse doit se voir depuis n'importe quel ecran. */}
+        <RecordingBanner />
 
         <main key={location.pathname} className="cd-rise mx-auto max-w-6xl px-4 py-6 sm:px-6">
           <Outlet />
