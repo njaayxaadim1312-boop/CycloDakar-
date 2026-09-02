@@ -300,6 +300,7 @@ return [
 
     'roles' => [
         'MEMBER' => 'Membre',
+        'RIDE_LEADER' => 'Chef de groupe',
         'COLLECTOR' => 'Collecteur',
         'TREASURER' => 'Trésorier',
         'ADMIN' => 'Administrateur',

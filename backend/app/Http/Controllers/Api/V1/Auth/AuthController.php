@@ -191,8 +191,11 @@ final class AuthController extends Controller
         // `tokenCan()` ; c'est une seconde barrière, en plus des Policies.
         $abilities = match (true) {
             $user->role->isAdmin() => ['*'],
-            $user->role->canManageFinance() => ['finance:*', 'collect:*', 'member:*'],
-            $user->role->canCollect() => ['collect:*', 'member:*'],
+            $user->role->canManageFinance() => ['finance:*', 'collect:*', 'rides:*', 'member:*'],
+            $user->role->canCollect() => ['collect:*', 'rides:*', 'member:*'],
+            // Le chef de groupe encadre les sorties et n'approche pas l'argent :
+            // son jeton ne porte AUCUNE capacite de collecte.
+            $user->role->canLeadRides() => ['rides:*', 'member:*'],
             default => ['member:*'],
         };
 

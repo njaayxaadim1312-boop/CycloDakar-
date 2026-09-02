@@ -14,8 +14,10 @@ use App\Models\User;
  * Trois cercles distincts, et la distinction est volontaire :
  *
  *  - **tout membre** voit les événements annoncés et s'y inscrit ;
- *  - **un collecteur et au-dessus** crée les sorties et pointe les présences —
- *    ce sont les personnes déjà sur le terrain le jour J ;
+ *  - **un CHEF DE GROUPE et au-dessus** crée les sorties, en trace
+ *    l'itinéraire et pointe les présences. Ce rôle a été introduit pour cela :
+ *    tant qu'encadrer exigeait d'être collecteur, il fallait confier la caisse
+ *    à quelqu'un qui voulait seulement mener le groupe le dimanche matin ;
  *  - **seuls l'auteur et un administrateur** modifient ou annulent une sortie.
  *    Sans cela, n'importe quel collecteur pourrait déplacer la sortie d'un
  *    autre, et personne ne saurait qui l'a fait.
@@ -39,7 +41,7 @@ final class EventPolicy
 
     public function create(User $user): bool
     {
-        return $user->role->canCollect();
+        return $user->role->canLeadRides();
     }
 
     public function update(User $user, Event $event): bool
@@ -72,10 +74,17 @@ final class EventPolicy
         return $user->member !== null && $this->view($user, $event);
     }
 
-    /** Pointer les présences : les encadrants de la sortie. */
+    /**
+     * Pointer les présences : les encadrants de la sortie.
+     *
+     * `canLeadRides()` et non `canCollect()` : celui qui a mené le groupe est
+     * précisément celui qui sait qui était là. Exiger le rôle de collecteur
+     * obligerait le chef de groupe à faire pointer par quelqu'un d'autre, qui
+     * n'y était pas.
+     */
     public function manageAttendance(User $user, Event $event): bool
     {
-        return $user->role->canCollect();
+        return $user->role->canLeadRides();
     }
 
     /**

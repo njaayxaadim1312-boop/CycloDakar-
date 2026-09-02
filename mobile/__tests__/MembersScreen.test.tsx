@@ -159,7 +159,7 @@ describe('MembersScreen', () => {
     useAuth.setState({
       user: aUser({
         role: 'COLLECTOR',
-        abilities: { collect: true, manage_finance: false, administer: false },
+        abilities: { lead_rides: true, collect: true, manage_finance: false, administer: false },
       }),
       ready: true,
     })

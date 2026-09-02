@@ -16,7 +16,14 @@
 
 ## 2. Autorisations (RBAC)
 
-Cinq rôles : `MEMBER`, `COLLECTOR`, `TREASURER`, `ADMIN`, `SUPER_ADMIN`.
+Six rôles : `MEMBER`, `RIDE_LEADER`, `COLLECTOR`, `TREASURER`, `ADMIN`,
+`SUPER_ADMIN`.
+
+**`RIDE_LEADER` (chef de groupe) se place entre le membre et le collecteur.**
+C'est une séparation des pouvoirs, pas une commodité : encadrer une sortie —
+la planifier, en tracer l'itinéraire, pointer les présences — n'ouvre aucun
+accès à l'argent du club. Auparavant, planifier exigeait le rôle de collecteur,
+si bien que nommer un chef de groupe revenait à lui confier la caisse.
 
 Règle du projet : **aucune vérification de rôle dans un contrôleur.** Tout passe par
 des Policies Laravel (`authorize('pay', $participation)`), ce qui garantit qu'une

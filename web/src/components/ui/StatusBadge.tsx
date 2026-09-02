@@ -42,6 +42,7 @@ export function MemberStatusBadge({
  */
 const ROLE_STYLE: Record<RoleCode, { bg: string; fg: string }> = {
   MEMBER: { bg: 'var(--cd-surface-2)', fg: 'var(--cd-text-muted)' },
+  RIDE_LEADER: { bg: 'var(--cd-green-soft)', fg: 'var(--cd-green-hover)' },
   COLLECTOR: { bg: 'var(--cd-blue-soft)', fg: 'var(--cd-blue)' },
   TREASURER: { bg: 'var(--cd-orange-soft)', fg: 'var(--cd-orange-text)' },
   ADMIN: { bg: 'var(--cd-black)', fg: '#ffffff' },

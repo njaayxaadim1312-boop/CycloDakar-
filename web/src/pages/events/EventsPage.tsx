@@ -59,7 +59,10 @@ export function EventsPage() {
 
   const events = query.data?.data ?? []
   const meta = query.data?.meta
-  const canCreate = user?.abilities.collect === true
+  // `lead_rides` et non `collect` : planifier une sortie ne demande pas
+  // d'approcher l'argent du club. C'est tout l'intérêt du rôle de chef de
+  // groupe — voir `UserRole` côté serveur.
+  const canCreate = user?.abilities.lead_rides === true
 
   return (
     <div className="space-y-5">

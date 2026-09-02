@@ -13,6 +13,8 @@ export type SportCode = 'CYCLING' | 'RUNNING' | 'HIKING' | 'WALKING'
 
 export type RoleCode =
   | 'MEMBER'
+  /** Chef de groupe : planifie les sorties, trace l'itinéraire, pointe. */
+  | 'RIDE_LEADER'
   | 'COLLECTOR'
   | 'TREASURER'
   | 'ADMIN'
@@ -131,6 +133,13 @@ export interface AppConfig {
  * modifié ne gagne donc aucun droit, il ne fait que s'afficher différemment.
  */
 export interface UserAbilities {
+  /**
+   * Encadrer une sortie : la planifier, en tracer l'itinéraire, pointer.
+   *
+   * Volontairement distinct de `collect` : c'est cette séparation qui permet
+   * de nommer un chef de groupe sans lui confier la caisse.
+   */
+  lead_rides: boolean
   collect: boolean
   manage_finance: boolean
   administer: boolean

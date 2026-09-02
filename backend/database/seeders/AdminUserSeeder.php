@@ -34,27 +34,35 @@ final class AdminUserSeeder extends Seeder
         $phone = PhoneNumber::normalize((string) env('SEED_ADMIN_PHONE', '770000000'));
         $password = (string) env('SEED_ADMIN_PASSWORD', 'CycloDakar2026!');
 
+        /*
+         | Le compte administrateur est cree S'IL MANQUE, et le seeder
+         | CONTINUE dans tous les cas.
+         |
+         | Il s'arretait ici quand l'administrateur existait deja. Consequence :
+         | tout compte de demonstration ajoute par la suite — le chef de groupe
+         | de la phase 12 bis, par exemple — n'apparaissait jamais sur une base
+         | deja initialisee. Un seeder idempotent doit pouvoir completer ce qui
+         | manque, pas seulement partir de zero.
+         */
         if (User::withTrashed()->where('email', $email)->exists()) {
             $this->command->info("Compte administrateur déjà présent : {$email}");
+        } else {
+            $this->createAccount(
+                name: 'Ousmane Faye',
+                email: $email,
+                phone: $phone,
+                password: $password,
+                role: UserRole::SuperAdmin,
+            );
 
-            return;
+            $this->command->newLine();
+            $this->command->info('Compte administrateur créé :');
+            $this->command->line("  Email        : {$email}");
+            $this->command->line('  Téléphone    : '.PhoneNumber::format($phone));
+            $this->command->line("  Mot de passe : {$password}");
+            $this->command->warn('  Changez ce mot de passe dès la première connexion.');
+            $this->command->newLine();
         }
-
-        $this->createAccount(
-            name: 'Ousmane Faye',
-            email: $email,
-            phone: $phone,
-            password: $password,
-            role: UserRole::SuperAdmin,
-        );
-
-        $this->command->newLine();
-        $this->command->info('Compte administrateur créé :');
-        $this->command->line("  Email        : {$email}");
-        $this->command->line('  Téléphone    : '.PhoneNumber::format($phone));
-        $this->command->line("  Mot de passe : {$password}");
-        $this->command->warn('  Changez ce mot de passe dès la première connexion.');
-        $this->command->newLine();
 
         if (app()->environment('local')) {
             $this->createDemoAccounts($password);
@@ -93,12 +101,18 @@ final class AdminUserSeeder extends Seeder
     {
         $accounts = [
             ['Fatou Sow', 'collecteur@cyclodakar.sn', '770000001', UserRole::Collector],
+            // Le chef de groupe : il planifie les sorties et pointe les
+            // presences, et n'a AUCUN acces a l'argent du club. C'est
+            // precisement ce que ce compte de demonstration doit montrer.
+            ['Ibrahima Fall', 'chef@cyclodakar.sn', '770000004', UserRole::RideLeader],
             ['Moussa Diop', 'tresorier@cyclodakar.sn', '770000002', UserRole::Treasurer],
             ['Awa Ndiaye', 'membre@cyclodakar.sn', '770000003', UserRole::Member],
         ];
 
+        $crees = 0;
+
         foreach ($accounts as [$name, $email, $phone, $role]) {
-            if (User::where('email', $email)->exists()) {
+            if (User::withTrashed()->where('email', $email)->exists()) {
                 continue;
             }
 
@@ -109,9 +123,15 @@ final class AdminUserSeeder extends Seeder
                 password: $password,
                 role: $role,
             );
+
+            $crees++;
         }
 
-        $this->command->info('3 comptes de démonstration créés.');
+        // Le nombre est COMPTE, pas ecrit en dur : un total fige mentirait des
+        // qu'un compte s'ajoute a la liste, ce qui vient d'arriver.
+        $this->command->info($crees === 0
+            ? 'Comptes de démonstration déjà présents.'
+            : "{$crees} compte(s) de démonstration créé(s).");
     }
 
     /**
@@ -133,10 +153,14 @@ final class AdminUserSeeder extends Seeder
             ['Ndeye', 'Thiam', '770000015', MemberStatus::Former],
         ];
 
+        $crees = 0;
+
         foreach ($people as [$firstName, $lastName, $phone, $status]) {
             if (Member::where('phone', PhoneNumber::normalize($phone))->exists()) {
                 continue;
             }
+
+            $crees++;
 
             $this->members->create([
                 'first_name' => $firstName,
@@ -147,6 +171,10 @@ final class AdminUserSeeder extends Seeder
             ]);
         }
 
-        $this->command->info('6 membres sans compte créés (adhérents sans smartphone).');
+        // Compté, pas écrit en dur : le message annonçait « 6 créés » même
+        // quand aucun ne l'était, ce qui laissait croire à des doublons.
+        $this->command->info($crees === 0
+            ? 'Membres sans compte déjà présents.'
+            : "{$crees} membre(s) sans compte créé(s) (adhérents sans smartphone).");
     }
 }

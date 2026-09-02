@@ -148,6 +148,9 @@ export const useIsAuthenticated = () => useAuth((state) => state.user !== null)
  */
 const ROLE_LEVEL: Record<RoleCode, number> = {
   MEMBER: 10,
+  // 15 : encadrer une sortie n'ouvre aucun accès à l'argent. Miroir de
+  // `UserRole::level()`.
+  RIDE_LEADER: 15,
   COLLECTOR: 20,
   TREASURER: 30,
   ADMIN: 40,

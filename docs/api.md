@@ -798,6 +798,26 @@ en exister (règle I1).
 
 ## 4. Contrôle par rôle
 
+Six rôles, du moins au plus étendu :
+
+| Rôle | Ce qu'il fait |
+|---|---|
+| `MEMBER` | S'inscrit aux sorties, enregistre ses parcours, consulte **ses** cotisations |
+| `RIDE_LEADER` | **Chef de groupe** : planifie les sorties, trace l'itinéraire, pointe les présences |
+| `COLLECTOR` | Encaisse — uniquement sur les dettes qui lui sont assignées |
+| `TREASURER` | Caisse, annulations, rapports, dépenses |
+| `ADMIN` | Rôles, paramètres, journal d'audit |
+| `SUPER_ADMIN` | Tout |
+
+**Le chef de groupe se place SOUS le collecteur, et c'est délibéré.** Encadrer
+une sortie et manier de l'argent sont deux responsabilités distinctes. Tant que
+planifier un itinéraire exigeait le rôle de collecteur, nommer quelqu'un chef de
+groupe revenait à lui ouvrir la caisse. Son jeton ne porte d'ailleurs **aucune**
+capacité de collecte : `['rides:*', 'member:*']`.
+
+L'inverse est assumé : un collecteur, étant au-dessus, peut aussi proposer une
+sortie. Une sortie mal placée se corrige ; un franc disparu ne se retrouve pas.
+
 Le middleware `role:` raisonne en **rôle minimum** :
 
 ```php

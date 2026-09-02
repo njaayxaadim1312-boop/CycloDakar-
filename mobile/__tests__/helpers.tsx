@@ -87,7 +87,7 @@ export const aUser = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
   phone_formatted: '77 000 00 03',
   role: 'MEMBER',
   role_label: 'Membre',
-  abilities: { collect: false, manage_finance: false, administer: false },
+  abilities: { lead_rides: false, collect: false, manage_finance: false, administer: false },
   is_active: true,
   last_login_at: null,
   created_at: null,

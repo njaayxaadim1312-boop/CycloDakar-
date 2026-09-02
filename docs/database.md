@@ -31,14 +31,14 @@ Compte de connexion. Un `user` ↔ un `member` (1-1).
 | email | VARCHAR(180) UNIQUE NULL | login possible par email |
 | phone | VARCHAR(20) UNIQUE NULL | login possible par téléphone (usage local) |
 | password | VARCHAR(255) | bcrypt |
-| role | VARCHAR(20) | `MEMBER` \| `COLLECTOR` \| `TREASURER` \| `ADMIN` \| `SUPER_ADMIN` |
+| role | VARCHAR(20) | `MEMBER` \| `RIDE_LEADER` \| `COLLECTOR` \| `TREASURER` \| `ADMIN` \| `SUPER_ADMIN` |
 | is_active | BOOLEAN | désactivation sans suppression |
 | last_login_at | TIMESTAMP NULL | |
 | email_verified_at, remember_token, timestamps, deleted_at | | |
 
 Index : `email`, `phone`, `role`.
 
-> **Note RBAC.** Le rôle principal vit sur `users.role` (rapide, suffisant pour 5 rôles).
+> **Note RBAC.** Le rôle principal vit sur `users.role` (rapide, suffisant pour 6 rôles).
 > Les tables `roles` / `permissions` / `role_user` sont prévues pour les permissions fines
 > (ex. : un collecteur autorisé sur une seule participation) et alimentées à partir de la
 > phase 3. Le champ `users.role` reste la source de vérité du rôle global.

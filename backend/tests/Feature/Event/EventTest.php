@@ -60,6 +60,14 @@ final class EventTest extends TestCase
         return $user;
     }
 
+    private function rideLeader(): User
+    {
+        $user = User::factory()->create(['role' => UserRole::RideLeader]);
+        Member::factory()->for($user)->create();
+
+        return $user;
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([
@@ -85,6 +93,31 @@ final class EventTest extends TestCase
         $this->actingAs_($this->member())
             ->postJson('/api/v1/events', $this->payload())
             ->assertStatus(403);
+    }
+
+    #[Test]
+    public function un_chef_de_groupe_planifie_une_sortie_sans_acceder_a_l_argent(): void
+    {
+        /*
+         | Le role de chef de groupe existe pour cela : encadrer une sortie et
+         | manier de l'argent sont deux responsabilites differentes, confiees a
+         | des personnes differentes.
+         |
+         | Tant que planifier exigeait le role de collecteur, nommer quelqu'un
+         | chef de groupe revenait a lui ouvrir la caisse. On verifie donc les
+         | deux sens : ce qu'il peut, et ce qu'il ne peut pas.
+         */
+        $chef = $this->rideLeader();
+
+        $this->actingAs_($chef)
+            ->postJson('/api/v1/events', $this->payload())
+            ->assertStatus(201)
+            ->assertJsonPath('data.title', 'Grand Tour Cyclo Dakar');
+
+        // Et il reste tenu a l'ecart de tout ce qui touche a l'argent.
+        $this->actingAs_($chef)->getJson('/api/v1/participations')->assertForbidden();
+        $this->actingAs_($chef)->getJson('/api/v1/finance/cash')->assertForbidden();
+        $this->actingAs_($chef)->getJson('/api/v1/finance/collections')->assertForbidden();
     }
 
     #[Test]

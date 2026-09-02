@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -193,8 +194,44 @@ final class LoginTest extends TestCase
             ->assertJsonPath('data.user.abilities.administer', false);
 
         $this->assertSame(
-            ['finance:*', 'collect:*', 'member:*'],
+            ['finance:*', 'collect:*', 'rides:*', 'member:*'],
             $tresorier->tokens()->first()->abilities,
+        );
+    }
+
+    #[Test]
+    public function le_chef_de_groupe_encadre_les_sorties_sans_approcher_l_argent(): void
+    {
+        /*
+         | Le role existe POUR CELA. Tant qu'encadrer une sortie exigeait
+         | d'etre collecteur, il fallait confier la caisse a quelqu'un qui
+         | voulait seulement mener le groupe le dimanche matin.
+         |
+         | On verifie donc les deux sens : ce qu'il peut, et surtout ce qu'il
+         | ne peut pas.
+         */
+        $chef = User::factory()->create([
+            'role' => UserRole::RideLeader,
+            'email' => 'chef@cyclodakar.sn',
+            'password' => Hash::make('cyclo2026'),
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'login' => 'chef@cyclodakar.sn',
+            'password' => 'cyclo2026',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.user.abilities.lead_rides', true)
+            // AUCUN acces a l'argent, a aucun titre.
+            ->assertJsonPath('data.user.abilities.collect', false)
+            ->assertJsonPath('data.user.abilities.manage_finance', false)
+            ->assertJsonPath('data.user.abilities.administer', false);
+
+        // Le jeton lui-meme ne porte aucune capacite de collecte : c'est la
+        // seconde barriere, en plus des Policies.
+        $this->assertSame(
+            ['rides:*', 'member:*'],
+            $chef->tokens()->first()->abilities,
         );
     }
 }

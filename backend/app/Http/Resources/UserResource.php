@@ -38,6 +38,10 @@ final class UserResource extends JsonResource
             // l'autorisation réelle est refaite à chaque requête par les
             // Policies. Un client modifié ne gagne donc aucun droit.
             'abilities' => [
+                // Encadrer une sortie n'ouvre AUCUN acces a l'argent : les
+                // deux capacites sont distinctes, et c'est tout l'interet du
+                // role de chef de groupe.
+                'lead_rides' => $this->role->canLeadRides(),
                 'collect' => $this->role->canCollect(),
                 'manage_finance' => $this->role->canManageFinance(),
                 'administer' => $this->role->isAdmin(),

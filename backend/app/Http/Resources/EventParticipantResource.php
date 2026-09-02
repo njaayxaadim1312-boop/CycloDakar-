@@ -29,7 +29,9 @@ final class EventParticipantResource extends JsonResource
     public function toArray(Request $request): array
     {
         $viewer = $request->user();
-        $canManage = $viewer !== null && $viewer->role->canCollect();
+        // Le chef de groupe, pas le collecteur : c'est lui qui a mene la
+        // sortie, donc lui qui sait qui etait la.
+        $canManage = $viewer !== null && $viewer->role->canLeadRides();
 
         return [
             'member' => $this->whenLoaded('member', fn () => [

@@ -204,6 +204,10 @@ est consultable par le trésorier et l'administrateur — c'est le contrôle con
 
 ## 7. Permissions
 
+Le **chef de groupe** (`RIDE_LEADER`) n'apparaît pas dans ce tableau, et c'est
+le point : il n'a strictement aucun droit financier. Il encadre les sorties.
+Ses droits se lisent colonne `MEMBER`.
+
 | Action | MEMBER | COLLECTOR | TREASURER | ADMIN | SUPER_ADMIN |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Voir ses propres participations | ✅ | ✅ | ✅ | ✅ | ✅ |

@@ -38,6 +38,7 @@ export function RoleBadge({ role, label }: { role: RoleCode; label: string }) {
   // dans une liste de 200 membres.
   const palette: Record<RoleCode, { bg: string; fg: string }> = {
     MEMBER: { bg: colors.surface2, fg: colors.textMuted },
+    RIDE_LEADER: { bg: colors.greenSoft, fg: colors.greenHover },
     COLLECTOR: { bg: colors.blueSoft, fg: colors.blue },
     TREASURER: { bg: colors.orangeSoft, fg: colors.orangeText },
     ADMIN: { bg: colors.black, fg: '#FFFFFF' },

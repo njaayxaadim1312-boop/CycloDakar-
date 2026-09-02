@@ -77,6 +77,8 @@ Splash → Login / Register
    ├─ Événements ...... liste → détail → inscription
    ├─ Participations .. mes participations, mon reste à payer
    ├─ Scanner QR ...... réservé aux rôles COLLECTOR et supérieurs
+   │                    (le chef de groupe ne scanne pas : le scan mène à
+   │                     l'encaissement, donc à l'argent)
    ├─ Classements ..... hebdomadaire / mensuel / annuel
    ├─ Challenges ...... objectif et progression
    ├─ Notifications
