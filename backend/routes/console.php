@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\V1\HealthController;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -59,3 +61,31 @@ Schedule::command('cyclo:snapshot-leaderboards')
 Schedule::command('cyclo:reminders')
     ->dailyAt('18:00')
     ->withoutOverlapping();
+
+/**
+ * Le battement de cœur du planificateur (phase 20).
+ *
+ * UN PLANIFICATEUR ARRÊTÉ NE PEUT PAS SIGNALER SON PROPRE ARRÊT.
+ *
+ * Les trois tâches ci-dessus ne tournent qu'une fois par jour : si le
+ * planificateur meurt un lundi, rien ne le dit avant qu'on s'étonne, des
+ * semaines plus tard, que le solde ne soit plus contrôlé et que plus aucun
+ * rappel ne parte. Le silence ressemble trop au fonctionnement normal.
+ *
+ * Ce battement d'une minute donne à la sonde de santé le seul signal qui ne
+ * dépende pas du rouage surveillé : son ABSENCE. Voir `HealthController`.
+ *
+ * Il est écrit dans le cache et non en base pour ne pas ajouter une écriture
+ * par minute à une table que personne ne relira — le cache est déjà stocké en
+ * base ici, mais il s'y purge tout seul.
+ */
+Schedule::call(function (): void {
+    Cache::put(
+        HealthController::HEARTBEAT,
+        now()->toIso8601String(),
+        // Une journée : bien au-delà de la tolérance de la sonde, mais assez
+        // court pour qu'un battement oublié finisse par disparaître plutôt que
+        // de faire croire indéfiniment à un planificateur vivant.
+        now()->addDay(),
+    );
+})->everyMinute()->name('battement-planificateur');
