@@ -229,6 +229,14 @@ export interface Member {
   full_name: string
   initials: string
   photo_url: string | null
+  /**
+   * L'image de fond du compte — le « fond d'écran » du membre.
+   *
+   * `null` quand il n'en a pas choisi : c'est au client de décider quoi
+   * afficher. Le serveur ne renvoie pas d'image par défaut, sans quoi on
+   * ne distinguerait plus « n'a rien choisi » de « a choisi ceci ».
+   */
+  cover_url: string | null
   status: MemberStatusCode
   status_label: string
   joined_at: string | null
@@ -1256,4 +1264,49 @@ export interface ChallengeInput {
   ends_on: string
   icon?: string
   status?: ChallengeStatusCode
+}
+
+/* -------------------------------------------------------------------------- */
+/* Notifications — PHASE 17                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Une notification.
+ *
+ * `code` est un identifiant STABLE — `payment.received`, `event.reminder` — et
+ * non le nom de la classe PHP. Le client choisit son icône et sa destination
+ * dessus ; exposer le nom de classe ferait fuiter l'arborescence du code dans
+ * l'API, et la renommer casserait les notifications déjà en base.
+ *
+ * `payload` porte ce qui est propre à chaque type — un numéro de reçu, un
+ * montant. Un client qui ne connaît pas un type doit pouvoir l'afficher quand
+ * même : titre, corps et destination suffisent, et une version d'application
+ * plus ancienne que le serveur continue donc de fonctionner.
+ */
+export interface AppNotification {
+  id: string
+  code: string
+  title: string
+  body: string
+  url: string | null
+  icon: string
+  read: boolean
+  read_at: string | null
+  created_at: string | null
+  payload: Record<string, unknown>
+}
+
+export interface NotificationsMeta {
+  unread: number
+  current_page: number
+  last_page: number
+  total: number
+  has_more: boolean
+}
+
+/** Un appareil enregistré pour le push. Pas de jeton, pas de push. */
+export interface DeviceInput {
+  token: string
+  device_name?: string | null
+  platform?: string | null
 }

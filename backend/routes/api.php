@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\ParticipationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\MemberController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
 
@@ -154,6 +155,18 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::delete('/{member}', [MemberController::class, 'destroy'])->name('destroy');
 
             Route::post('/{member}/role', [MemberController::class, 'updateRole'])->name('role');
+            /*
+            | L'image de fond du compte — chacun choisit la sienne.
+            |
+            | POST et non PUT : c'est un televersement multipart, et PHP ne
+            | remplit `$_FILES` que sur une requete POST. Le meme piege que
+            | pour la photo de membre, et la meme reponse.
+            */
+            Route::post('/{member}/cover', [MemberController::class, 'updateCover'])
+                ->name('cover.update');
+            Route::delete('/{member}/cover', [MemberController::class, 'removeCover'])
+                ->name('cover.destroy');
+
             Route::post('/{member}/rotate-qr', [MemberController::class, 'rotateQrCode'])->name('rotate-qr');
 
             // Image du QR, en SVG — PHASE 11.
@@ -428,6 +441,43 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         /*
         |----------------------------------------------------------------------
+        | Notifications — PHASE 17
+        |----------------------------------------------------------------------
+        |
+        | TOUT EST STRICTEMENT PERSONNEL. Aucune de ces routes ne prend
+        | d'identifiant d'utilisateur : on ne lit et on ne marque que ses
+        | propres notifications, celles de la session. Un parametre `user`
+        | ouvrirait la lecture des notifications d'autrui — et elles portent
+        | des montants, des dettes, des decisions financieres.
+        |
+        | `unread-count` existe separement de la liste : c'est le seul chiffre
+        | dont l'interface a besoin en permanence, et charger trente
+        | notifications pour afficher une pastille serait absurde.
+        |
+        | Les APPAREILS : enregistrer un jeton est un POST idempotent, appele a
+        | chaque demarrage du mobile — Expo peut changer le jeton apres une
+        | mise a jour du systeme, et un jeton perime ne previent pas, il cesse
+        | simplement de recevoir. Le retirer est aussi le reglage « ne plus me
+        | notifier » : pas de jeton, pas de push. Les notifications EN BASE,
+        | elles, continuent d'arriver — elles ne reveillent personne.
+        */
+        Route::prefix('notifications')->name('notifications.')->group(function (): void {
+            Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::get('/unread-count', [NotificationController::class, 'unreadCount'])
+                ->name('unread-count');
+            Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])
+                ->name('read-all');
+            Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])
+                ->name('read');
+        });
+
+        Route::prefix('devices')->name('devices.')->group(function (): void {
+            Route::post('/', [NotificationController::class, 'registerDevice'])->name('register');
+            Route::delete('/', [NotificationController::class, 'forgetDevice'])->name('forget');
+        });
+
+        /*
+        |----------------------------------------------------------------------
         | Modules à venir
         |----------------------------------------------------------------------
         |
@@ -439,7 +489,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}
         | PHASE 15 — /activities/{id}/video, /video-jobs/{id}
-        | PHASE 17 — /notifications
         */
     });
 

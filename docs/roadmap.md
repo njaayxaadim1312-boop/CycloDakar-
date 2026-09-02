@@ -821,11 +821,111 @@ puisque les effacer ferait disparaître des badges gagnés.
 
 ---
 
-## ⏳ Phase 17 — Notifications
+## ✅ Phase 17 — Notifications *(terminée)*
 
-Notifications en base + push Expo : nouvelle sortie, rappel d'événement, rappel de
-participation impayée, confirmation de paiement, dépense à valider, challenge,
-classement, vidéo prête.
+**La base d'abord, le push ensuite.**
+
+L'écriture en base est le canal qui ne peut pas échouer : c'est elle qui garantit
+qu'un membre retrouvera l'information en ouvrant l'application, même si son
+téléphone était éteint, même si Expo était en panne. Le push n'est qu'un rappel.
+
+D'où la règle du canal Expo : **une notification qui échoue ne casse jamais
+l'acte qui l'a déclenchée**. Un encaissement enregistré, une dépense approuvée,
+un badge gagné — ces actes sont accomplis. Faire remonter une erreur d'envoi
+annulerait la transaction : on perdrait de l'argent pour un ping raté.
+
+**Rien ne part avant que la transaction soit validée.**
+
+Réglé par `after_commit` sur la file, dans `config/queue.php`. Sans lui, un
+encaissement annulé en fin de transaction enverrait quand même « paiement
+enregistré », et le membre croirait avoir payé. Pire : le worker pourrait traiter
+le message AVANT que la transaction soit écrite, et ne trouverait alors aucun
+paiement à décrire. Le réglage est global plutôt que répété sur chaque
+notification — une règle qu'il faut penser à répéter finit par être oubliée
+quelque part.
+
+**Ce qui est envoyé, et surtout ce qui ne l'est pas**
+
+Le reçu d'encaissement était reporté depuis la phase 12 : le canal n'existait
+pas, et plutôt que de simuler un envoi, le reçu avait été rendu consultable.
+Le voici, avec son numéro — « paiement enregistré » sans référence ne permet
+rien de vérifier.
+
+L'**annulation** prévient aussi, et ce n'est pas optionnel : un membre à qui l'on
+a remis un reçu se croit à jour ; s'il apprend l'annulation devant un collecteur,
+en public, la faute retombera sur le club.
+
+Une **auto-approbation ne se notifie pas à elle-même**. Dire au trésorier « votre
+dépense a été approuvée » deux secondes après qu'il l'a saisie serait du bruit
+pur — et c'est ainsi qu'on apprend aux gens à ignorer les notifications. Pour la
+même raison, le demandeur n'est jamais invité à approuver sa propre dépense.
+
+**Les rappels ne se répètent pas**
+
+La sortie, la veille à 18 h — c'est le soir qu'on prépare son vélo. La
+cotisation, trois jours avant l'échéance, une seule fois. Un rappel utile devient
+du harcèlement à la troisième répétition, et c'est particulièrement vrai quand il
+parle d'argent : quelqu'un qui n'a pas payé ne l'a peut-être pas fait parce qu'il
+ne pouvait pas. Le message dit le montant, la date et le collecteur — factuel,
+sans reproche.
+
+Le rappel de sortie ne va qu'aux **inscrits**. Le rappeler à quelqu'un qui ne
+s'est pas inscrit n'est pas un rappel, c'est de la publicité.
+
+**Les appareils**
+
+Un membre, plusieurs appareils. Le jeton est unique en base : un téléphone prêté
+ou revendu change de propriétaire plutôt que d'être dupliqué — sans quoi l'ancien
+utilisateur continuerait de recevoir sur un appareil qui n'est plus le sien.
+
+Expo répond `DeviceNotRegistered` quand l'application a été désinstallée : le
+jeton est alors supprimé tout seul. Sans ce nettoyage, chaque envoi collectif
+traînerait des adresses mortes.
+
+Se désabonner revient à retirer son jeton — **pas de jeton, pas de push**. Une
+table de préférences par catégorie serait plus fine, mais elle n'aurait de sens
+qu'une fois qu'on saura quelles notifications gênent réellement, et on ne le
+saura qu'en les envoyant.
+
+**Vidéo prête : sans objet**
+
+La roadmap prévoyait une notification « vidéo prête ». La vidéo de parcours est
+générée **dans le navigateur** depuis la phase 15 : il n'existe aucun travail
+serveur à annoncer. Une notification serait envoyée par le client à lui-même,
+pour l'informer de ce qu'il vient de faire.
+
+**Vérifié**
+
+442 tests backend (16 pour cette phase). La cloche a été ouverte dans un vrai
+Chrome, avec une notification réelle : la pastille compte, le panneau affiche le
+numéro de reçu, et l'ouverture marque comme lu.
+
+---
+
+## Hors phase — le fond d'écran du compte
+
+À la demande du club : **chaque membre choisit l'image de fond de son compte.**
+
+La photo de profil dit qui l'on est aux autres ; le fond d'écran dit à quoi
+ressemble SON application quand on l'ouvre. Un membre qui met la corniche au
+lever du jour derrière ses anneaux s'approprie l'outil — et un outil qu'on
+s'approprie s'ouvre plus souvent.
+
+Sur `members` et non sur `users` : un adhérent sans compte de connexion a une
+fiche, et rien ne justifie de le priver d'une image que quelqu'un aurait pu
+choisir pour lui. Disque public, contrairement aux justificatifs de dépense :
+c'est un décor, servi à chaque chargement d'écran, et le faire passer par une
+route authentifiée coûterait une requête PHP par affichage pour protéger une
+photo de paysage.
+
+L'aperçu montre l'image **avec le voile** que l'application applique. Choisir sur
+une vignette claire pour découvrir ensuite que l'image passe sous un dégradé
+sombre fait recommencer trois fois.
+
+`cyclo:promote` complète l'ensemble : attribuer un rôle depuis la console, avec
+révocation des jetons et trace d'audit — exactement ce que fait l'API. Il faut
+bien un premier administrateur, et pouvoir en rétablir un le jour où le seul
+compte super administrateur est perdu.
 
 ---
 

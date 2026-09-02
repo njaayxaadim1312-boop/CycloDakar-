@@ -20,6 +20,7 @@ import {
   RoleBadge,
 } from '@/components/ui/StatusBadge'
 import { useTheme, type ThemeChoice } from '@/hooks/useTheme'
+import { CoverPicker } from '@/components/members/CoverPicker'
 import { API_URL, ApiError, postData } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { fetchMyMember, rotateQrCode } from '@/lib/members'
@@ -52,6 +53,12 @@ export function ProfilePage() {
         title="Mon compte"
         description="Votre fiche club, votre mot de passe et vos préférences."
       />
+
+      {/* --- Le fond d'écran ------------------------------------------------
+          Placé en tête, et c'est voulu : c'est ce que le membre vient changer
+          quand il ouvre cette page pour la personnaliser. Le reste — mot de
+          passe, sessions — se règle une fois puis s'oublie. */}
+      {member.data?.permissions?.update === true && <CoverPicker member={member.data} />}
 
       {/* --- Identité ----------------------------------------------------- */}
       <section className="cd-card p-5 sm:p-6">

@@ -169,6 +169,22 @@ class Member extends Model
             : Storage::disk(config('cyclo.uploads.public_disk'))->url($this->photo_path);
     }
 
+    /**
+     * L'image de fond choisie par le membre — son « fond d'écran ».
+     *
+     * `null` quand il n'en a pas choisi : c'est alors au client de décider quoi
+     * afficher. Renvoyer une image par défaut ICI empêcherait de distinguer
+     * « n'a rien choisi » de « a choisi cette image-là », et le jour où l'on
+     * voudra proposer un décor différent par saison, il faudrait revenir
+     * jusqu'au serveur.
+     */
+    public function coverUrl(): ?string
+    {
+        return $this->cover_path === null
+            ? null
+            : Storage::disk(config('cyclo.uploads.public_disk'))->url($this->cover_path);
+    }
+
     public function formattedPhone(): ?string
     {
         return PhoneNumber::format($this->phone);

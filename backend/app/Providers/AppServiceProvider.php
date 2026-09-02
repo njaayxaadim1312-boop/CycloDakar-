@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Notifications\Channels\ExpoPushChannel;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +23,19 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureModels();
         $this->configureRateLimiting();
+        $this->configureNotifications();
+    }
+
+    /**
+     * Le canal push Expo, déclaré auprès du gestionnaire de notifications.
+     *
+     * `extend` et non un canal maison branché à la main : Laravel s'occupe
+     * alors de la file d'attente, des tentatives et de la sérialisation, et
+     * `via()` peut nommer « expo » comme n'importe quel autre canal.
+     */
+    private function configureNotifications(): void
+    {
+        Notification::extend('expo', fn ($app) => $app->make(ExpoPushChannel::class));
     }
 
     /**

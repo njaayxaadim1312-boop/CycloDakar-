@@ -10,6 +10,7 @@ use App\Models\Activity;
 use App\Models\Challenge;
 use App\Models\ChallengeMember;
 use App\Models\Member;
+use App\Notifications\ChallengeCompleted;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -106,11 +107,19 @@ final class ChallengeService
 
         // L'objectif vient d'être atteint : on FIGE la date. Une fois posée,
         // elle ne bouge plus, même si la progression retombe.
-        if ($progression >= $challenge->target && ! $inscription->hasCompleted()) {
+        $vientDeReussir = $progression >= $challenge->target && ! $inscription->hasCompleted();
+
+        if ($vientDeReussir) {
             $attributs['completed_at'] = now();
         }
 
         $inscription->update($attributs);
+
+        if ($vientDeReussir) {
+            // La seule notification du projet qui apporte une bonne nouvelle
+            // sans rien demander en retour.
+            $inscription->member->user?->notify(new ChallengeCompleted($challenge));
+        }
 
         return $inscription->fresh();
     }
@@ -133,12 +142,19 @@ final class ChallengeService
                 $progression = $totaux[$inscription->member_id] ?? 0;
 
                 $attributs = ['progress' => $progression];
+                $vientDeReussir = $progression >= $challenge->target
+                    && ! $inscription->hasCompleted();
 
-                if ($progression >= $challenge->target && ! $inscription->hasCompleted()) {
+                if ($vientDeReussir) {
                     $attributs['completed_at'] = $maintenant;
                 }
 
                 $inscription->update($attributs);
+
+                if ($vientDeReussir) {
+                    $inscription->member->user?->notify(new ChallengeCompleted($challenge));
+                }
+
                 $touches++;
             }
         });

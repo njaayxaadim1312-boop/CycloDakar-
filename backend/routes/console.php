@@ -44,3 +44,18 @@ Schedule::command('finance:recompute-balance')
 Schedule::command('cyclo:snapshot-leaderboards')
     ->dailyAt('03:20')
     ->withoutOverlapping();
+
+/**
+ * Les rappels du jour : sortie de demain, cotisation à échéance (phase 17).
+ *
+ * 18 h, et pas le matin. C'est le soir qu'on prépare son vélo et qu'on décide
+ * de se lever ; un rappel envoyé à 7 h pour une sortie du lendemain se perd
+ * dans la journée. Pour une cotisation, l'heure importe moins — mais mieux
+ * vaut un seul créneau que deux tâches à surveiller.
+ *
+ * La commande ne fait rien la plupart du temps, et c'est le but : une commande
+ * qui trouverait toujours quelque chose à envoyer enverrait trop.
+ */
+Schedule::command('cyclo:reminders')
+    ->dailyAt('18:00')
+    ->withoutOverlapping();

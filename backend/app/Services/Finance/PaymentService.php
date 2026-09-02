@@ -13,6 +13,8 @@ use App\Models\ParticipationMember;
 use App\Models\Payment;
 use App\Models\TransactionCategory;
 use App\Models\User;
+use App\Notifications\PaymentCancelled;
+use App\Notifications\PaymentReceived;
 use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -173,10 +175,24 @@ final class PaymentService
                 ],
             );
 
-            // PHASE 17 — notification « Paiement de X FCFA enregistré » au
-            // membre. Le canal (push, SMS) n'existe pas encore ; le reçu, lui,
-            // est réel dès maintenant et consultable par le membre dans son
-            // espace. On ne simule pas un envoi qui n'a pas lieu.
+            /*
+             | Le reçu part au membre — PHASE 17.
+             |
+             | `afterCommit` : la notification ne doit exister que si
+             | l'encaissement existe. Envoyée dans la transaction, elle
+             | partirait aussi quand celle-ci est annulée, et un membre
+             | recevrait « paiement enregistré » pour un paiement qui n'a
+             | jamais eu lieu.
+             |
+             | Un membre sans compte de connexion — un adhérent sans
+             | smartphone — n'a personne à notifier. Ce n'est pas une erreur :
+             | son reçu papier fait foi.
+             */
+            $destinataire = $membre->user;
+
+            if ($destinataire !== null) {
+                $destinataire->notify(new PaymentReceived($paiement));
+            }
 
             return ['payment' => $paiement->fresh(), 'replayed' => false];
         }, attempts: 3);
@@ -219,6 +235,19 @@ final class PaymentService
             ])->save();
 
             $payment->line->recalculate();
+
+            /*
+             | Prévenir le membre n'est PAS optionnel.
+             |
+             | Il a un reçu en main et se croit à jour. S'il apprend
+             | l'annulation devant un collecteur, en public, la faute retombera
+             | sur le club — et il aura raison.
+             */
+            $destinataire = $payment->member->user;
+
+            if ($destinataire !== null) {
+                $destinataire->notify(new PaymentCancelled($payment->fresh()));
+            }
 
             $this->audit->log(
                 action: 'payment.reversed',

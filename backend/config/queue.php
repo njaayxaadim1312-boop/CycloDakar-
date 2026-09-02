@@ -40,6 +40,20 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
+
+            /*
+            | Rien ne part avant que la transaction SQL soit validée.
+            |
+            | Sans cela, une notification « paiement enregistré » partirait
+            | aussi quand la transaction est annulée — et le membre croirait
+            | avoir payé. Pire : le worker pourrait traiter le message AVANT
+            | que la transaction soit écrite, et ne trouverait alors aucun
+            | paiement à décrire.
+            |
+            | Réglé ici plutôt que sur chaque notification : une règle qu'il
+            | faut penser à répéter finit par être oubliée quelque part.
+            */
+            'after_commit' => true,
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
             'after_commit' => false,
         ],

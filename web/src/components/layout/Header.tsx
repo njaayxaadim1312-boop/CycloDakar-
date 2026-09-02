@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { ChevronDown, LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { NotificationBell } from '@/components/layout/NotificationBell'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth, useCurrentUser } from '@/stores/auth'
 
@@ -37,6 +38,11 @@ export function Header({ title, subtitle, onOpenMenu }: HeaderProps) {
             <p className="truncate text-xs text-[var(--cd-text-muted)]">{subtitle}</p>
           )}
         </div>
+
+        {/* La cloche avant le thème : on la cherche plus souvent qu'on ne
+            change de thème, et l'ordre d'une barre se lit de droite à gauche
+            par fréquence d'usage. */}
+        <NotificationBell />
 
         <button
           type="button"

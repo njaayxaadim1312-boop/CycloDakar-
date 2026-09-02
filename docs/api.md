@@ -688,6 +688,20 @@ et **révocation de toutes les sessions** du membre — les jetons émis portaie
 les capacités de l'ancien rôle, et une rétrogradation doit prendre effet
 immédiatement.
 
+### `POST /members/{uuid}/cover` · `DELETE /members/{uuid}/cover`
+
+L'image de fond du compte — le « fond d'écran » de chaque membre. Multipart,
+champ `cover`, image seulement.
+
+Autorisation `update` sur la fiche : **chacun choisit le sien**, l'administration
+gère les autres. C'est déjà la règle de la photo, et un décor n'a pas à être
+plus verrouillé qu'un portrait.
+
+`cover_url` est `null` quand rien n'a été choisi. Le serveur ne renvoie pas
+d'image par défaut : sans quoi on ne distinguerait plus « n'a rien choisi » de
+« a choisi ceci », et changer le décor par défaut demanderait de revenir jusqu'au
+serveur.
+
 ### `POST /members/{uuid}/rotate-qr`
 
 Révoque le QR Code et en émet un nouveau. Accessible à l'intéressé et aux
@@ -948,6 +962,66 @@ corrigée — la date reste.
 
 ---
 
+## 3 quinquies. Notifications — phase 17
+
+**Tout est strictement personnel.** Aucune de ces routes ne prend d'identifiant
+d'utilisateur : on ne lit et on ne marque que ses propres notifications, celles
+de la session. Un paramètre `user` ouvrirait la lecture des notifications
+d'autrui — et elles portent des montants, des dettes, des décisions
+financières.
+
+### `GET /notifications?unread=&per_page=`
+
+`meta.unread` accompagne toujours la liste. `code` est un identifiant **stable**
+(`payment.received`, `event.reminder`), pas le nom de la classe PHP : le client
+choisit son icône et sa destination dessus, et un client plus ancien que le
+serveur continue de fonctionner — titre, corps et URL suffisent.
+
+### `GET /notifications/unread-count`
+
+Route séparée, et c'est délibéré : c'est le seul chiffre dont l'interface a
+besoin en continu. Charger trente notifications pour afficher une pastille
+serait absurde sur un réseau mobile.
+
+### `POST /notifications/{id}/read` · `POST /notifications/read-all`
+
+Marquer une notification qui n'est pas la sienne renvoie **404**, pas 403 : elle
+ne doit pas être distinguable d'une notification inexistante, sinon on pourrait
+éprouver l'existence d'un identifiant.
+
+### `POST /devices` · `DELETE /devices`
+
+```json
+{ "token": "ExponentPushToken[...]", "device_name": "Redmi Note 12" }
+```
+
+Appelé à chaque démarrage du mobile : Expo peut changer le jeton après une mise
+à jour du système, et un jeton périmé ne prévient pas — il cesse simplement de
+recevoir.
+
+Le jeton est **unique en base**. S'il appartenait à quelqu'un d'autre — un
+téléphone prêté, revendu — il change de propriétaire plutôt que d'être dupliqué.
+
+`DELETE` est aussi le réglage « ne plus me notifier » : **pas de jeton, pas de
+push**. Les notifications en base, elles, continuent d'arriver — elles ne
+réveillent personne, et un membre doit retrouver ce qu'on lui a dit même s'il a
+coupé les alertes.
+
+### Ce que le club envoie
+
+| Code | Quand | À qui |
+|---|---|---|
+| `payment.received` | Encaissement enregistré | Le membre qui a payé |
+| `payment.cancelled` | Reçu annulé | Le membre — il a un reçu en main |
+| `expense.pending` | Dépense au-dessus du seuil | Trésoriers et admins, **sauf le demandeur** |
+| `expense.decided` | Approuvée ou refusée | Le demandeur, sauf auto-approbation |
+| `event.announced` | Sortie annoncée | Tout le club, **une seule fois** |
+| `event.reminder` | La veille, 18 h | Les **inscrits** seulement |
+| `participation.due` | 3 jours avant l'échéance | Les membres qui doivent encore |
+| `challenge.completed` | Objectif atteint | Le membre |
+
+---
+
 ## 4. Contrôle par rôle
 
 Six rôles, du moins au plus étendu :
@@ -1041,13 +1115,6 @@ POST   /internal/video-jobs/{uuid}/complete
 POST   /internal/video-jobs/{uuid}/fail
 ```
 
-### Phase 17 — Notifications
-
-```http
-GET    /notifications
-POST   /notifications/{id}/read
-POST   /notifications/read-all
-```
 
 ### Phase 19 — Administration
 

@@ -368,6 +368,51 @@ final class MemberController extends Controller
     }
 
     /**
+     * Change l'image de fond du compte — le « fond d'écran » du membre.
+     *
+     * CHACUN CHOISIT LE SIEN.
+     *
+     * L'autorisation est `update` sur la fiche : un membre gère la sienne,
+     * l'administration gère les autres. C'est déjà la règle pour la photo, et
+     * il n'y a aucune raison qu'un décor soit plus verrouillé qu'un portrait.
+     *
+     * Une image seulement, et pas de PDF : c'est un fond d'écran. La limite de
+     * taille est celle du projet — au-delà, elle coûterait plus en chargement
+     * qu'elle n'apporte en plaisir, sur un réseau mobile sénégalais.
+     */
+    public function updateCover(Request $request, Member $member): JsonResponse
+    {
+        $this->authorize('update', $member);
+
+        $request->validate([
+            'cover' => [
+                'required',
+                'image',
+                'max:'.config('cyclo.uploads.max_size_kb'),
+                'mimetypes:'.implode(',', (array) config('cyclo.uploads.image_mimes')),
+            ],
+        ], [
+            'cover.required' => "Choisissez une image.",
+            'cover.image' => "Le fond d'écran doit être une image.",
+            'cover.max' => 'Cette image est trop lourde : elle ralentirait chaque ouverture.',
+        ]);
+
+        $this->members->updateCover($member, $request->file('cover'));
+
+        return ApiResponse::ok(new MemberResource($member->fresh()->load('user')));
+    }
+
+    /** Retire l'image de fond : on revient au décor par défaut. */
+    public function removeCover(Request $request, Member $member): JsonResponse
+    {
+        $this->authorize('update', $member);
+
+        $this->members->removeCover($member);
+
+        return ApiResponse::ok(new MemberResource($member->fresh()->load('user')));
+    }
+
+    /**
      * Révoque le QR Code actuel et en émet un nouveau.
      * À utiliser quand un membre pense que son QR a été copié.
      */

@@ -46,6 +46,15 @@ final class MemberResource extends JsonResource
 
             'photo_url' => $this->photoUrl(),
 
+            /*
+             | L'image de fond du compte.
+             |
+             | Exposée à TOUS les lecteurs, comme la photo : c'est un décor, pas
+             | une donnée personnelle. Un membre qui choisit la corniche au
+             | lever du jour ne révèle rien de lui en la montrant.
+             */
+            'cover_url' => $this->coverUrl(),
+
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
 

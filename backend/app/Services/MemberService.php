@@ -147,6 +147,45 @@ final class MemberService
         }
     }
 
+    /**
+     * Remplace l'image de fond du compte.
+     *
+     * Même logique que la photo, et pour les mêmes raisons : nom de fichier
+     * REGÉNÉRÉ — jamais celui fourni par le client, qui peut contenir n'importe
+     * quoi — et suppression de l'ancienne APRÈS l'écriture de la nouvelle.
+     *
+     * L'ordre compte : supprimer d'abord laisserait un membre sans fond si
+     * l'écriture échouait, alors que l'inverse ne laisse qu'un fichier orphelin
+     * — un ennui de disque, pas un ennui d'utilisateur.
+     */
+    public function updateCover(Member $member, UploadedFile $cover): void
+    {
+        $disk = Storage::disk(config('cyclo.uploads.public_disk'));
+        $previous = $member->cover_path;
+
+        $path = $cover->storeAs(
+            'covers',
+            Str::uuid().'.'.$cover->extension(),
+            ['disk' => config('cyclo.uploads.public_disk')],
+        );
+
+        $member->forceFill(['cover_path' => $path])->save();
+
+        if ($previous !== null && $previous !== $path) {
+            $disk->delete($previous);
+        }
+    }
+
+    public function removeCover(Member $member): void
+    {
+        if ($member->cover_path === null) {
+            return;
+        }
+
+        Storage::disk(config('cyclo.uploads.public_disk'))->delete($member->cover_path);
+        $member->forceFill(['cover_path' => null])->save();
+    }
+
     public function removePhoto(Member $member): void
     {
         if ($member->photo_path === null) {

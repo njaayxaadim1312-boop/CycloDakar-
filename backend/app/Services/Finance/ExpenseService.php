@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Finance;
 
 use App\Enums\ExpenseStatus;
+use App\Enums\UserRole;
 use App\Enums\TransactionDirection;
 use App\Enums\TransactionSource;
 use App\Models\CashAccount;
 use App\Models\Expense;
 use App\Models\TransactionCategory;
 use App\Models\User;
+use App\Notifications\ExpenseAwaitingApproval;
+use App\Notifications\ExpenseDecided;
 use App\Services\AuditLogger;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -95,11 +98,26 @@ final class ExpenseService
                 ],
             );
 
-            if ($this->qualifiesForAutoApproval($expense, $author)) {
+            $automatique = $this->qualifiesForAutoApproval($expense, $author);
+
+            if ($automatique) {
                 // Approuvée dans la MÊME transaction : une dépense qui serait
                 // créée puis approuvée en deux temps pourrait rester en
                 // attente si le second appel échouait.
                 $expense = $this->approve($expense, $author, auto: true);
+            } else {
+                /*
+                 | Prévenir ceux qui peuvent décider — PHASE 17.
+                 |
+                 | C'est cette notification qui fait vivre le circuit de
+                 | validation. Sans elle, une dépense au-dessus du seuil attend
+                 | que quelqu'un pense à ouvrir l'écran, pendant que le
+                 | fournisseur, lui, attend d'être payé.
+                 |
+                 | Le demandeur en est exclu : on n'approuve pas sa propre
+                 | dépense, et l'inviter à le faire serait au mieux inutile.
+                 */
+                $this->notifyApprovers($expense, $author);
             }
 
             return $expense;
@@ -154,6 +172,20 @@ final class ExpenseService
                 'financial_transaction_id' => $ecriture->id,
             ])->save();
 
+            /*
+             | Le demandeur apprend la décision — SAUF s'il vient de la prendre
+             | lui-même.
+             |
+             | Une approbation automatique sous le seuil est déclenchée par le
+             | trésorier qui saisit. Lui notifier « votre dépense a été
+             | approuvée » deux secondes après qu'il l'a saisie serait du bruit
+             | pur — et c'est exactement ainsi qu'on apprend aux gens à ignorer
+             | les notifications.
+             */
+            if (! $auto) {
+                $expense->requester?->notify(new ExpenseDecided($expense->fresh()));
+            }
+
             $this->audit->log(
                 action: 'expense.approved',
                 entity: $expense,
@@ -195,6 +227,10 @@ final class ExpenseService
             'decision_reason' => $reason,
         ])->save();
 
+        // Un refus muet se conteste, se reformule à l'identique, et use la
+        // patience de tout le monde. Le motif part avec.
+        $expense->requester?->notify(new ExpenseDecided($expense->fresh()));
+
         $this->audit->log(
             action: 'expense.rejected',
             entity: $expense,
@@ -207,6 +243,22 @@ final class ExpenseService
     }
 
     /* ---------------------------------------------------------------------- */
+
+    /**
+     * Prévient ceux qui ont le pouvoir de décider — sauf le demandeur.
+     */
+    private function notifyApprovers(Expense $expense, User $author): void
+    {
+        $approbateurs = User::query()
+            ->whereIn('role', [UserRole::Treasurer, UserRole::Admin, UserRole::SuperAdmin])
+            ->where('id', '!=', $author->id)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($approbateurs as $approbateur) {
+            $approbateur->notify(new ExpenseAwaitingApproval($expense));
+        }
+    }
 
     /**
      * Une dépense se valide-t-elle toute seule ?
