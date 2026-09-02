@@ -543,11 +543,88 @@ l'exécution, ce qui aurait cassé l'encaissement sur le terrain.
 
 ---
 
-## ⏳ Phase 13 — Recettes, dépenses et caisse
+## ✅ Phase 13 — Recettes, dépenses et caisse *(terminée)*
 
-Grand livre `financial_transactions`, catégories, dépenses avec justificatifs et
-circuit de validation à seuil configurable, tableau de bord de caisse, journal de
-caisse, commande de recalcul du solde.
+Le grand livre et la commande de recalcul étaient arrivés avec la phase 12 — un
+encaissement qui ne bouge pas la caisse est un mensonge. Restaient les sorties,
+et c'est là que se joue l'essentiel.
+
+**L'invariant qui gouverne toute la phase**
+
+Une dépense en attente n'a **aucune** ligne au grand livre. Ce n'est pas de
+l'argent sorti : c'est une intention. L'écriture naît dans la même transaction
+SQL que l'approbation, jamais avant.
+
+La conséquence se voit partout dans l'interface : le trésorier lit trois
+nombres qui ne se mélangent pas — ce que le club **a**, ce qu'il a **engagé**,
+et ce qu'il **attend** encore des collectes. Les additionner ferait engager une
+dépense sur de l'argent qui n'est pas arrivé. C'est l'erreur qui coule un club,
+et elle est ici rendue impossible à commettre par inadvertance : trois libellés
+distincts, jusque dans le JSON.
+
+**Le double regard, dans les deux sens**
+
+On n'approuve pas sa propre dépense — **et on ne la refuse pas non plus**. La
+symétrie est volontaire : sans elle, il suffirait de saisir puis de refuser pour
+faire disparaître une demande gênante sans laisser de décideur au journal.
+
+Ce n'est pas une supposition de malhonnêteté. C'est la protection de celui qui
+tient la caisse, qui doit pouvoir montrer qu'il n'a jamais décidé seul.
+
+**Le seuil demande DEUX conditions**
+
+Sous 25 000 FCFA **et** saisie par quelqu'un qui aurait de toute façon le droit
+d'approuver. Un circuit de validation pour 3 000 FCFA d'eau minérale ne serait
+pas suivi, et une règle qu'on contourne protège moins qu'une règle
+proportionnée — mais sans la seconde condition, le seuil deviendrait une porte
+ouverte pour qui n'a pas la responsabilité de la caisse.
+
+L'interface annonce la règle **avant** l'envoi : découvrir après coup qu'il faut
+un second regard donne l'impression d'un refus, alors que c'est le
+fonctionnement normal.
+
+**Une dépense refusée reste, avec son motif**
+
+Le bureau doit pouvoir expliquer pourquoi 80 000 FCFA de transport n'ont pas été
+engagés, et le demandeur mérite de savoir pourquoi on lui a dit non. Une ligne
+effacée ne répond à aucune de ces deux questions.
+
+**Les justificatifs ne sont jamais publics**
+
+Une facture porte un fournisseur, un montant, parfois un numéro de compte. Les
+fichiers vivent sur le disque privé ; le téléchargement passe par une route qui
+vérifie le rôle et refuse toute mise en cache. Un test vérifie qu'un membre
+ordinaire reçoit 403, et qu'un fichier qui n'est ni image ni PDF est écarté.
+
+**Recettes manuelles : l'asymétrie assumée**
+
+Un don entre directement au grand livre, sans circuit de validation. De l'argent
+qui entre ne peut pas appauvrir le club, et exiger un double regard pour
+enregistrer un don ferait perdre la trace du don. Le libellé est en revanche
+obligatoire : dans six mois, personne ne saura d'où venaient 150 000 FCFA.
+
+**Le journal de caisse**
+
+La pièce qu'on imprime en assemblée. Sa colonne « Solde » est **lue**, jamais
+recalculée à l'affichage : c'est ce qui garantit qu'un journal se réimprime
+identique six mois plus tard, même si une écriture antérieure a été
+contre-passée entre-temps. Une note explique qu'elle suit l'ordre
+d'enregistrement — sans elle, une saisie antidatée la ferait passer pour
+incohérente et l'on chercherait un bug qui n'existe pas.
+
+**Le tableau de bord dit enfin la vérité**
+
+La tuile « Solde de caisse » affichait `available: false` depuis la phase 4.
+Elle montre désormais un vrai montant, et l'engagé **à côté** — pas fondu
+dedans. Une tuile se lit vite, sans réfléchir : c'est précisément là qu'un total
+trop malin fait des dégâts.
+
+**Vérifié**
+
+396 tests backend (29 pour cette phase), 65 mobile. Les six écrans financiers
+ont été rendus dans un **vrai Chrome** piloté au DevTools Protocol, avec une
+session authentifiée : `tsc` vérifie les types, pas ce qui plante à
+l'exécution.
 
 ---
 

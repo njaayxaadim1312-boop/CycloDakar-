@@ -344,10 +344,18 @@ final class CashIntegrityTest extends TestCase
         $this->actingAs_($this->user(UserRole::Treasurer))
             ->getJson('/api/v1/finance/cash')
             ->assertOk()
-            // Le solde est annoncé INCOMPLET tant que les dépenses ne sont pas
-            // saisies : le présenter comme le solde réel du club tromperait le
-            // bureau.
-            ->assertJsonPath('data.complete', false);
+            /*
+             | Depuis la PHASE 13, le solde est COMPLET : recettes et dépenses
+             | passent toutes par le grand livre.
+             |
+             | Ce champ n'est pas décoratif. En phase 12, il valait `false` et
+             | portait la raison : les dépenses n'étaient pas encore saisies, et
+             | présenter ce montant comme le solde réel du club aurait trompé le
+             | bureau. Il reste exposé pour que ce genre de demi-vérité soit
+             | toujours dicible plutôt que tue.
+             */
+            ->assertJsonPath('data.complete', true)
+            ->assertJsonPath('data.incomplete_reason', null);
     }
 
     /* ---------------------------------------------------------------------- */

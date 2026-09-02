@@ -9,6 +9,9 @@ import { ManagementPage } from '@/pages/ManagementPage'
 import { ParticipationDetailPage } from '@/pages/participations/ParticipationDetailPage'
 import { ParticipationFormPage } from '@/pages/participations/ParticipationFormPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
+import { CashPage } from '@/pages/finance/CashPage'
+import { ExpensesPage } from '@/pages/finance/ExpensesPage'
+import { LedgerPage } from '@/pages/finance/LedgerPage'
 import { CollectionsPage } from '@/pages/payments/CollectionsPage'
 import { CollectPage } from '@/pages/payments/CollectPage'
 import { MyDuesPage } from '@/pages/payments/MyDuesPage'
@@ -131,6 +134,12 @@ export default function App() {
           <Route path="/payments" element={<CollectPage />} />
           <Route path="/mes-cotisations" element={<MyDuesPage />} />
           <Route path="/finance/collectes" element={<CollectionsPage />} />
+
+          {/* Caisse — PHASE 13. `/finance` est le tableau de bord ; le journal
+              en est le detail ecriture par ecriture. */}
+          <Route path="/finance" element={<CashPage />} />
+          <Route path="/finance/expenses" element={<ExpensesPage />} />
+          <Route path="/finance/transactions" element={<LedgerPage />} />
 
           <Route path="/participations" element={<ParticipationsPage />} />
           <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />

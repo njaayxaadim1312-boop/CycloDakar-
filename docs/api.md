@@ -796,6 +796,86 @@ en exister (règle I1).
 
 ---
 
+## 3 ter. Caisse et dépenses — phase 13
+
+### `GET /finance/dashboard?from=&to=` — trésorier, admin
+
+Le mois en cours par défaut. **Trois nombres qui ne se mélangent pas** :
+
+| Champ | Ce que c'est |
+|---|---|
+| `balance` | Ce que le club a réellement, écriture par écriture |
+| `committed` | Dépenses décidées, **pas encore approuvées** — aucune ligne au grand livre (I4) |
+| `receivable` | Créances sur les collectes ouvertes — **pas de la trésorerie** |
+
+Les additionner ferait croire au bureau qu'il peut engager une dépense sur de
+l'argent qui n'est pas arrivé. C'est l'erreur qui coule un club, et c'est
+pourquoi les trois portent des noms distincts jusque dans le JSON.
+
+`income`, `expenses`, `net` et `by_category` portent sur la période. Tout est
+**calculé** depuis le grand livre ; aucun total n'est stocké.
+
+### `GET /finance/transactions` — le journal de caisse
+
+Filtres : `from`, `to`, `direction`, `category` (code), `event` (uuid).
+
+`balance_after` est **lu, jamais recalculé** : c'est ce qui garantit qu'un
+journal imprimé en assemblée se réimprime identique six mois plus tard. Il suit
+l'ordre d'**enregistrement**, pas la date métier — voir
+[finance.md](finance.md) §2.
+
+### `POST /finance/income` — trésorier, admin
+
+```json
+{ "category": "DON", "amount": 150000, "label": "Don de la mairie de Dakar" }
+```
+
+Entre **directement** au grand livre, sans circuit de validation. L'asymétrie
+avec les dépenses est voulue : de l'argent qui entre ne peut pas appauvrir le
+club, et exiger un double regard pour enregistrer un don ferait perdre la trace
+du don. Le libellé est obligatoire — un don anonyme n'est pas auditable.
+
+### `GET /finance/categories`
+
+Les postes actifs avec leur **sens** (`IN`/`OUT`). Sans lui, un formulaire de
+recette proposerait « Transport ».
+
+### `GET|POST /expenses` — trésorier, admin
+
+```json
+{ "category": "TRANSPORT", "amount": 80000, "label": "Bus Lac Rose",
+  "supplier": "Dakar Dem Dikk", "spent_on": "2026-09-01" }
+```
+
+Une dépense naît **toujours** `PENDING`, et une dépense `PENDING` n'a **aucune**
+ligne au grand livre. Le client ne peut pas demander un statut : sous
+25 000 FCFA (`cyclo.finance.expense_approval_threshold`) et saisie par un
+trésorier, elle est approuvée immédiatement — c'est le serveur qui en décide.
+
+Un collecteur ne saisit pas de dépense : l'argent qui **entre** relève du
+terrain, celui qui **sort** relève du bureau.
+
+### `POST /expenses/{uuid}/approve` · `POST /expenses/{uuid}/reject`
+
+Des **actes**, donc des POST — pas un `PATCH` sur `status`, qui laisserait
+croire qu'on peut repasser d'approuvé à en attente, c'est-à-dire défaire une
+écriture.
+
+**On n'approuve pas sa propre dépense**, et on ne la refuse pas non plus. La
+symétrie est volontaire : sans elle, il suffirait de saisir puis de refuser pour
+faire disparaître une demande gênante sans laisser de décideur au journal. Le
+refus exige un motif d'au moins dix caractères — le demandeur mérite de savoir
+pourquoi.
+
+### `POST|GET|DELETE /expenses/{uuid}/attachments[/{attachment}]`
+
+Image ou PDF. Le fichier va sur le disque **privé** et n'est jamais servi depuis
+`public/` : une facture porte un fournisseur, un montant, parfois un numéro de
+compte. Le téléchargement passe par cette route, qui vérifie le rôle et répond
+`Cache-Control: private, no-store`.
+
+---
+
 ## 4. Contrôle par rôle
 
 Six rôles, du moins au plus étendu :
@@ -876,22 +956,6 @@ GET    /participations/{id}         → attendu / encaissé / reste, par membre
 POST   /participations/{id}/members { member_ids[] }
 GET    /members/resolve/{qr_token}  → identifie un membre depuis son QR Code
 ```
-
-### Phase 13 — Finances
-
-```http
-GET    /finance/dashboard           → solde, recettes, dépenses, à collecter, engagé
-GET    /finance/transactions?from=&to=&direction=&category_id=&event_id=
-POST   /finance/income              { amount, income_category_id, label, occurred_on }
-POST   /expenses                    { amount, expense_category_id, description, spent_on }
-POST   /expenses/{id}/approve
-POST   /expenses/{id}/reject        { reason }
-POST   /expenses/{id}/attachments   (multipart : image ou PDF)
-GET    /finance/categories
-```
-
-Il n'existe **aucune** route permettant d'écrire un solde. Voir
-[finance.md](finance.md), invariant I1.
 
 ### Phase 14 — Rapports
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ActivityController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\EventParticipationController;
+use App\Http\Controllers\Api\V1\ExpenseController;
 use App\Http\Controllers\Api\V1\FinanceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\ParticipationController;
@@ -324,6 +325,56 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/cash', [FinanceController::class, 'cash'])->name('cash');
             Route::get('/collections', [FinanceController::class, 'collections'])
                 ->name('collections');
+
+            // PHASE 13 — tableau de bord, journal, recettes manuelles.
+            Route::get('/dashboard', [FinanceController::class, 'dashboard'])
+                ->name('dashboard');
+            Route::get('/transactions', [FinanceController::class, 'transactions'])
+                ->name('transactions');
+            Route::get('/categories', [FinanceController::class, 'categories'])
+                ->name('categories');
+
+            // Une recette manuelle entre DIRECTEMENT au grand livre, sans
+            // circuit de validation : de l'argent qui entre ne peut pas
+            // appauvrir le club, et exiger un double regard pour enregistrer
+            // un don ferait perdre la trace du don.
+            Route::post('/income', [FinanceController::class, 'storeIncome'])
+                ->name('income');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Depenses — PHASE 13
+        |----------------------------------------------------------------------
+        |
+        | Une depense en attente n'a AUCUNE ligne au grand livre : elle
+        | n'est pas de l'argent sorti, mais une intention (docs/finance.md, I4).
+        | L'ecriture nait dans la meme transaction SQL que l'approbation.
+        |
+        | Approuver et refuser sont des POST : ce sont des ACTES, pas des mises
+        | a jour de champ. Un PATCH sur `status` laisserait croire qu'on peut
+        | repasser d'approuve a en attente, ce qui reviendrait a defaire une
+        | ecriture — precisement ce que la regle I2 interdit.
+        |
+        | Les justificatifs ne sont JAMAIS servis depuis public/ : une facture
+        | porte un fournisseur, un montant, parfois un numero de compte.
+        */
+        Route::prefix('expenses')->name('expenses.')->group(function (): void {
+            Route::get('/', [ExpenseController::class, 'index'])->name('index');
+            Route::post('/', [ExpenseController::class, 'store'])->name('store');
+
+            Route::get('/{expense}', [ExpenseController::class, 'show'])->name('show');
+            Route::post('/{expense}/approve', [ExpenseController::class, 'approve'])
+                ->name('approve');
+            Route::post('/{expense}/reject', [ExpenseController::class, 'reject'])
+                ->name('reject');
+
+            Route::post('/{expense}/attachments', [ExpenseController::class, 'attach'])
+                ->name('attachments.store');
+            Route::get('/{expense}/attachments/{attachment}', [ExpenseController::class, 'attachment'])
+                ->name('attachments.show');
+            Route::delete('/{expense}/attachments/{attachment}', [ExpenseController::class, 'detach'])
+                ->name('attachments.destroy');
         });
 
         /*
@@ -338,7 +389,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}
-        | PHASE 13 — /finance/dashboard, /finance/transactions, /expenses
         | PHASE 14 — /finance/reports
         | PHASE 15 — /activities/{id}/video, /video-jobs/{id}
         | PHASE 16 — /challenges, /leaderboard

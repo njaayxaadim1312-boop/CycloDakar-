@@ -13,6 +13,8 @@ use App\Enums\MemberStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Activity;
+use App\Models\CashAccount;
+use App\Models\Expense;
 use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\Member;
@@ -321,8 +323,15 @@ final class StatsController extends Controller
      * Situation de la caisse.
      *
      * Renvoyée seulement au trésorier et au-dessus — sauf si le club a choisi
-     * la transparence (`settings.public_balance`). Le module arrive en phase 13 ;
-     * en attendant, on n'invente aucun montant.
+     * la transparence (`cyclo.finance.public_balance`).
+     *
+     * L'ENGAGÉ EST RENVOYÉ AVEC LE SOLDE, ET NON DÉDUIT DE LUI.
+     *
+     * Une dépense en attente n'a aucune ligne au grand livre : ce n'est pas de
+     * l'argent sorti (règle I4). Les additionner sur une tuile de tableau de
+     * bord — l'endroit où l'on regarde vite, sans réfléchir — serait la
+     * meilleure façon de faire engager une dépense sur de l'argent déjà promis
+     * ailleurs.
      *
      * @return array<string, mixed>
      */
@@ -335,7 +344,25 @@ final class StatsController extends Controller
             return ['visible' => false];
         }
 
-        return $this->pending(13) + ['visible' => true];
+        $caisse = CashAccount::query()
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->first();
+
+        if ($caisse === null) {
+            // Pas de caisse configurée : on le dit, on n'affiche pas zéro.
+            // « Rien » et « pas encore mesuré » ne se corrigent pas de la même
+            // façon, et les confondre ruine la confiance du bureau.
+            return ['visible' => true, 'available' => false, 'phase' => 13];
+        }
+
+        return [
+            'visible' => true,
+            'available' => true,
+            'balance' => (int) $caisse->current_balance,
+            'committed' => (int) Expense::query()->pending()->sum('amount'),
+            'pending_expenses' => Expense::query()->pending()->count(),
+        ];
     }
 
     /**

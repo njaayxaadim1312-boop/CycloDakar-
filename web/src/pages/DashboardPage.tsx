@@ -154,12 +154,27 @@ export function DashboardPage() {
             }
             loading={stats.isLoading}
           />
-          {stats.data?.finance.visible && (
+          {stats.data?.finance.visible === true && (
             <StatTile
               icon={Wallet}
               label="Solde de caisse"
               to="/finance"
-              phase={stats.data.finance.phase}
+              value={
+                stats.data.finance.balance === undefined
+                  ? undefined
+                  : formatFcfa(stats.data.finance.balance)
+              }
+              /* L'engagé est annoncé À CÔTÉ du solde, jamais fondu dedans.
+                 Une tuile de tableau de bord se lit vite, sans réfléchir :
+                 c'est précisément là qu'un total trop malin fait engager une
+                 dépense sur de l'argent déjà promis ailleurs. */
+              hint={
+                stats.data.finance.committed !== undefined &&
+                stats.data.finance.committed > 0
+                  ? `dont ${formatFcfa(stats.data.finance.committed)} déjà engagés`
+                  : undefined
+              }
+              phase={stats.data.finance.available === false ? 13 : undefined}
               loading={stats.isLoading}
             />
           )}

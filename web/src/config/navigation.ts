@@ -59,7 +59,7 @@ const FINANCE: RoleCode[] = ['TREASURER', 'ADMIN', 'SUPER_ADMIN']
 const COLLECT: RoleCode[] = ['COLLECTOR', 'TREASURER', 'ADMIN', 'SUPER_ADMIN']
 
 /** Dernière phase effectivement livrée — à incrémenter à chaque phase finie. */
-export const DELIVERED_THROUGH_PHASE = 12
+export const DELIVERED_THROUGH_PHASE = 13
 
 /* -------------------------------------------------------------------------- */
 /* Menu principal — l'exercice, et rien d'autre                               */
@@ -217,7 +217,7 @@ export const managementSections: NavSection[] = [
         phase: 13,
         roles: FINANCE,
         summary:
-          'Solde en temps réel, total des recettes et des dépenses, montants restant à collecter.',
+          "Trois nombres qui ne se mélangent pas : ce que le club a, ce qu'il a engagé, et ce qu'il attend encore. Les additionner ferait décider sur de l'argent qui n'est pas arrivé.",
       },
       {
         to: '/finance/expenses',
@@ -226,7 +226,7 @@ export const managementSections: NavSection[] = [
         phase: 13,
         roles: FINANCE,
         summary:
-          'Saisie des dépenses avec justificatif, catégorie et circuit de validation à seuil configurable.',
+          "Saisie avec justificatif et poste. Une dépense en attente n'a encore rien sorti de la caisse ; au-delà du seuil, un second responsable doit approuver.",
       },
       {
         to: '/finance/transactions',
@@ -235,7 +235,7 @@ export const managementSections: NavSection[] = [
         phase: 13,
         roles: FINANCE,
         summary:
-          'Grand livre chronologique. Source de vérité du solde, qui est dérivé et jamais écrit.',
+          "Le grand livre, écriture par écriture — la pièce qu'on imprime en assemblée. Source de vérité du solde, qui est dérivé et jamais écrit.",
       },
       {
         to: '/finance/reports',

@@ -364,7 +364,23 @@ export interface DashboardStats {
   /** `visible: false` sous le rôle de collecteur — et non un zéro. */
   participations: ParticipationDashboard
   /** `visible: false` quand le club garde la caisse privée. */
-  finance: { visible: boolean; available?: false; phase?: number }
+  /**
+   * La caisse.
+   *
+   * `visible: false` quand le lecteur n'y a pas droit : on ne montre alors
+   * RIEN, plutôt qu'un zéro qui laisserait croire que la caisse est vide.
+   *
+   * `committed` est renvoyé À CÔTÉ du solde, jamais déduit de lui : une
+   * dépense en attente n'a aucune ligne au grand livre (règle I4).
+   */
+  finance: {
+    visible: boolean
+    available?: boolean
+    phase?: number
+    balance?: Fcfa
+    committed?: Fcfa
+    pending_expenses?: number
+  }
   generated_at: string
 }
 
@@ -902,6 +918,176 @@ export interface CashState {
   balance: Fcfa
   /** Le même solde recalculé depuis le grand livre. Un écart = une anomalie. */
   derived_balance: Fcfa
+
+  /**
+   * Dépenses décidées mais pas encore approuvées.
+   *
+   * Informatif, et JAMAIS déduit du solde : une dépense en attente n'a aucune
+   * ligne au grand livre. La confondre avec le solde ferait décider le
+   * trésorier sur un chiffre faux (docs/finance.md, règle I4).
+   */
+  committed: Fcfa
+  balance_after_commitments: Fcfa
+  pending_expenses: number
+
   complete: boolean
   incomplete_reason: string | null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Caisse, dépenses et journal — PHASE 13                                     */
+/* -------------------------------------------------------------------------- */
+
+export type TransactionDirectionCode = 'IN' | 'OUT'
+
+export type ExpenseStatusCode = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+/** Un poste du grand livre. Le SENS en fait partie. */
+export interface LedgerCategory {
+  code: string
+  name: string
+  /**
+   * `IN` ou `OUT`. Sans ce champ, un formulaire de recette proposerait
+   * « Transport », et le rapport annuel serait faux sans que rien ne
+   * s'en aperçoive.
+   */
+  direction: TransactionDirectionCode
+}
+
+/** Un justificatif de dépense. */
+export interface ExpenseAttachment {
+  uuid: string
+  name: string
+  mime_type: string
+  size_bytes: number
+  is_image: boolean
+  /**
+   * URL d'une route CONTRÔLÉE, jamais un chemin dans `/storage`.
+   *
+   * Une facture porte un fournisseur, un montant, parfois un numéro de compte :
+   * elle n'a rien à faire dans un répertoire public.
+   */
+  url: string
+}
+
+/**
+ * Une dépense.
+ *
+ * `is_commitment` dit que le montant est **engagé mais pas encore sorti**.
+ * Sans lui, une interface additionnerait des dépenses dont une partie n'a
+ * jamais quitté la caisse, et le solde n'aurait plus l'air de correspondre.
+ */
+export interface Expense {
+  uuid: string
+  /** Entier de FCFA. */
+  amount: Fcfa
+  label: string
+  description: string | null
+  supplier: string | null
+  reference: string | null
+
+  status: ExpenseStatusCode
+  status_label: string
+  moved_money: boolean
+  is_commitment: boolean
+
+  category?: { code: string; name: string }
+  event?: { uuid: string; title: string } | null
+
+  spent_on: string
+  created_at: string | null
+
+  requested_by?: { uuid: string; name: string }
+  approved_by?: { uuid: string; name: string } | null
+  decided_at: string | null
+  decision_reason: string | null
+
+  attachments?: ExpenseAttachment[]
+
+  /**
+   * Décidées par le serveur. Le client s'en sert pour MASQUER, jamais pour
+   * autoriser : un approbateur ne peut pas approuver sa propre dépense, et
+   * cette règle ne se devine pas côté client.
+   */
+  permissions: {
+    approve: boolean
+    reject: boolean
+    update: boolean
+  } | null
+}
+
+export interface ExpenseInput {
+  category: string
+  /** Entier de FCFA. */
+  amount: number
+  label: string
+  description?: string | null
+  supplier?: string | null
+  reference?: string | null
+  event?: string | null
+  spent_on?: string
+}
+
+/** Une ligne du journal de caisse. */
+export interface LedgerEntry {
+  uuid: string
+  direction: TransactionDirectionCode
+  direction_label: string
+  /** Toujours POSITIF : le signe est porté par `direction`. */
+  amount: Fcfa
+  /**
+   * Le solde figé à l'écriture, LU et jamais recalculé à l'affichage.
+   *
+   * Il suit l'ordre d'ENREGISTREMENT, pas la date métier : trié par
+   * `occurred_on`, il n'est donc pas monotone dès qu'une saisie a été
+   * antidatée. C'est la réalité d'une caisse tenue à la main.
+   */
+  balance_after: Fcfa
+  label: string
+  source_type: string
+  source_label: string
+  category?: { code: string; name: string } | null
+  event?: { uuid: string; title: string } | null
+  reverses?: { uuid: string; label: string } | null
+  reason: string | null
+  occurred_on: string
+  created_at: string | null
+  author?: { uuid: string; name: string }
+}
+
+export interface IncomeInput {
+  category: string
+  amount: number
+  label: string
+  event?: string | null
+  occurred_on?: string
+}
+
+/**
+ * Le tableau de bord de la caisse.
+ *
+ * `committed` et `receivable` ne sont PAS de la trésorerie, et portent
+ * volontairement d'autres noms que `balance` : les additionner ferait croire au
+ * bureau qu'il peut engager une dépense sur de l'argent qui n'est pas arrivé.
+ */
+export interface CashDashboard {
+  balance: Fcfa
+  /** Dépenses décidées mais pas encore approuvées. Informatif. */
+  committed: Fcfa
+  balance_after_commitments: Fcfa
+
+  income: Fcfa
+  expenses: Fcfa
+  net: Fcfa
+
+  by_category: Array<{
+    direction: TransactionDirectionCode
+    code: string
+    name: string
+    amount: Fcfa
+    operations: number
+  }>
+
+  /** Ce qui reste à percevoir sur les collectes ouvertes. Pas de la caisse. */
+  receivable: Fcfa
 }

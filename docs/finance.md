@@ -1,7 +1,8 @@
 # Module financier — règles d'intégrité
 
-> Implémentation : phase 12 livrée (encaissements, grand livre, caisse) ;
-> phases 13 et 14 à venir (dépenses, journal complet, rapports).
+> Implémentation : phases 12 et 13 livrées (encaissements, grand livre,
+> dépenses, journal de caisse, tableau de bord). Phase 14 à venir (rapports
+> exportables).
 > Ce document a valeur de **contrat**. Toute évolution du module financier doit s'y conformer
 > ou modifier ce document en premier.
 
@@ -152,8 +153,23 @@ DB::transaction:
 POST /api/v1/expenses/{id}/reject   { reason }   → REJECTED, aucune écriture
 ```
 
-Le seuil vit dans `settings.expense_approval_threshold` (défaut : 25 000 FCFA).
-Un approbateur ne peut pas approuver sa propre dépense.
+Le seuil vit dans `cyclo.finance.expense_approval_threshold` (défaut :
+25 000 FCFA ; il passera dans les paramètres du club en phase 19).
+
+**L'auto-approbation demande DEUX conditions, pas une.** Sous le seuil *et*
+saisie par quelqu'un qui aurait de toute façon le droit d'approuver. Sans la
+seconde, le seuil deviendrait une porte ouverte pour qui n'a pas la
+responsabilité de la caisse.
+
+Un approbateur ne peut pas approuver sa propre dépense — **ni la refuser**. La
+symétrie est volontaire : si l'on pouvait refuser sans pouvoir approuver, il
+suffirait de saisir puis de refuser pour faire disparaître une demande gênante
+sans laisser de décideur au journal.
+
+Une dépense refusée **reste**, avec son motif. Le bureau doit pouvoir expliquer
+pourquoi 80 000 FCFA de transport n'ont pas été engagés, et le demandeur mérite
+de savoir pourquoi on lui a dit non. Une ligne effacée ne répond à aucune de ces
+deux questions.
 
 ### 3.3 Recette manuelle (don, sponsoring, vente)
 
