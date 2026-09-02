@@ -59,7 +59,7 @@ const FINANCE: RoleCode[] = ['TREASURER', 'ADMIN', 'SUPER_ADMIN']
 const COLLECT: RoleCode[] = ['COLLECTOR', 'TREASURER', 'ADMIN', 'SUPER_ADMIN']
 
 /** Dernière phase effectivement livrée — à incrémenter à chaque phase finie. */
-export const DELIVERED_THROUGH_PHASE = 10
+export const DELIVERED_THROUGH_PHASE = 12
 
 /* -------------------------------------------------------------------------- */
 /* Menu principal — l'exercice, et rien d'autre                               */
@@ -136,6 +136,14 @@ export const navigation: NavSection[] = [
     title: 'Mon espace',
     items: [
       {
+        to: '/mes-cotisations',
+        label: 'Mes cotisations',
+        icon: Wallet,
+        phase: 12,
+        summary:
+          "Ce que le club attend de vous, ce que vous avez déjà versé, et vos reçus. La seule page financière ouverte à un membre — et elle ne montre que lui.",
+      },
+      {
         to: '/profile',
         label: 'Mon compte',
         icon: UserRound,
@@ -191,7 +199,16 @@ export const managementSections: NavSection[] = [
         phase: 12,
         roles: COLLECT,
         summary:
-          'Enregistrement des paiements par recherche du membre ou par scan de son QR Code.',
+          "Les membres qui vous sont confiés, toutes collectes confondues : qui doit combien, son téléphone, et l'encaissement en deux appuis.",
+      },
+      {
+        to: '/finance/collectes',
+        label: 'Collectes par collecteur',
+        icon: ShieldCheck,
+        phase: 12,
+        roles: FINANCE,
+        summary:
+          "Qui a encaissé combien, et combien d'opérations ont été annulées. C'est le contrôle contre le détournement, pas une statistique de confort.",
       },
       {
         to: '/finance',

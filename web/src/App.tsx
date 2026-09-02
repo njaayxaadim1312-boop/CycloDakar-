@@ -9,6 +9,9 @@ import { ManagementPage } from '@/pages/ManagementPage'
 import { ParticipationDetailPage } from '@/pages/participations/ParticipationDetailPage'
 import { ParticipationFormPage } from '@/pages/participations/ParticipationFormPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
+import { CollectionsPage } from '@/pages/payments/CollectionsPage'
+import { CollectPage } from '@/pages/payments/CollectPage'
+import { MyDuesPage } from '@/pages/payments/MyDuesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { RecordPage } from '@/pages/record/RecordPage'
 import { SystemStatusPage } from '@/pages/SystemStatusPage'
@@ -121,6 +124,14 @@ export default function App() {
           <Route path="/record" element={<RecordPage />} />
 
           {/* Participations — phase 10. « nouvelle » avant « :uuid ». */}
+          {/* Encaissements — PHASE 12. `/payments` est l'ecran de TERRAIN du
+              collecteur ; `/mes-cotisations` est la vue du membre sur son
+              propre compte, et la seule page financiere qui lui soit
+              ouverte. */}
+          <Route path="/payments" element={<CollectPage />} />
+          <Route path="/mes-cotisations" element={<MyDuesPage />} />
+          <Route path="/finance/collectes" element={<CollectionsPage />} />
+
           <Route path="/participations" element={<ParticipationsPage />} />
           <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />
           <Route path="/participations/:uuid" element={<ParticipationDetailPage />} />

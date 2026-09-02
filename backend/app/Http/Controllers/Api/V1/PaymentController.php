@@ -230,6 +230,48 @@ final class PaymentController extends Controller
         ]);
     }
 
+    /**
+     * Ce qu'un membre doit, vu par un collecteur.
+     *
+     * C'est ce qui donne son sens au scan du QR Code : on reconnait quelqu'un,
+     * et on voit immediatement ce qu'il reste a percevoir — sans le chercher
+     * dans une liste, au bord d'une route.
+     *
+     * Seules les collectes OUVERTES et les dettes non soldees apparaissent :
+     * un collecteur n'a que faire de l'historique, il a besoin de savoir quoi
+     * demander maintenant. Le droit d'encaisser est calcule ligne par ligne
+     * par le serveur (`can_pay`).
+     */
+    public function memberDues(Request $request, Member $member): JsonResponse
+    {
+        $this->authorize('viewAny', Payment::class);
+
+        $lignes = ParticipationMember::query()
+            ->where('member_id', $member->id)
+            ->whereIn('status', [
+                ParticipationMemberStatus::Unpaid,
+                ParticipationMemberStatus::Partial,
+            ])
+            ->whereHas('participation', fn ($q) => $q->where('status', 'OPEN'))
+            ->with(['participation', 'collector', 'member'])
+            ->orderBy('id')
+            ->get();
+
+        return ApiResponse::ok(
+            ParticipationLineResource::collection($lignes),
+            meta: [
+                'member' => [
+                    'uuid' => $member->uuid,
+                    'matricule' => $member->matricule,
+                    'full_name' => $member->fullName(),
+                ],
+                'remaining_amount' => (int) $lignes->sum(
+                    fn (ParticipationMember $ligne) => $ligne->remaining(),
+                ),
+            ],
+        );
+    }
+
     private function findLine(Participation $participation, string $memberUuid): ?ParticipationMember
     {
         $memberId = Member::where('uuid', $memberUuid)->value('id');

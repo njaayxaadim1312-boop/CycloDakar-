@@ -469,13 +469,77 @@ justifie tout ce module, et le point d'accroche est marqué dans l'écran.
 
 ---
 
-## ⏳ Phase 12 — Paiements
+## ✅ Phase 12 — Paiements *(terminée)*
 
-Encaissement par recherche ou par scan, moyens de paiement (espèces, Wave, Orange
-Money, Free Money, virement), clé d'idempotence, statuts, contre-passation,
-notification de reçu au membre.
+Le contrat comptable de [finance.md](finance.md) devient exécutable.
 
-Contrat à respecter : [finance.md](finance.md).
+**Le grand livre, livré avec les encaissements**
+
+La phase ne devait porter que les paiements, mais un encaissement qui ne bouge
+pas la caisse est un mensonge — et `balance_after` est figé à l'écriture, donc
+impossible à reconstituer après coup. Les tables `cash_accounts`,
+`transaction_categories` et `financial_transactions` arrivent donc ici. Les
+dépenses, le journal complet et les rapports restent en phases 13 et 14.
+
+**Les trois protections de l'encaissement**
+
+- **Idempotence.** Un collecteur encaisse sans réseau : la requête part, la
+  réponse se perd, le téléphone réessaie. La clé, obligatoire et unique en
+  base, fait retrouver le paiement au lieu d'en créer un second. Deux
+  versements volontaires du même montant restent possibles — deux clés.
+- **Plafond du reste dû**, relu **sous verrou** : sans quoi deux collecteurs
+  simultanés solderaient chacun la totalité.
+- **Statut dérivé.** `paid_amount` et `status` se recalculent depuis la somme
+  réelle des paiements non annulés, jamais reçus du client.
+
+**Ce qui est impossible, et vérifié comme tel**
+
+Écrire un solde par l'API. Modifier ou supprimer une écriture du grand livre —
+les modèles lèvent une exception, la règle n'est pas qu'un paragraphe. Annuler
+un paiement qu'on a soi-même encaissé : c'est le contrôle élémentaire contre le
+détournement, réservé au trésorier. Annuler deux fois la même écriture.
+
+Une annulation est une **contre-passation** : sens inverse, même montant, motif
+obligatoire de dix caractères. Le reçu reste consultable, marqué annulé — un
+membre qui se présente avec son papier le retrouve toujours.
+
+**Le contrôle contre le détournement**
+
+`GET /finance/collections` : qui a encaissé combien, et combien d'opérations ont
+été annulées, **comptées à part**. Les mélanger masquerait exactement ce qu'on
+cherche à voir.
+
+**`finance:recompute-balance`**, chaque nuit à 3 h, **sans `--fix`.** Un écart
+signifie qu'une écriture est passée hors de `CashLedger` ; le réparer en silence
+masquerait la cause. La commande sort en échec, ce qui se voit. Elle vérifie
+aussi la suite des `balance_after` — la colonne « Solde » du journal imprimé en
+AG — dans l'ordre d'enregistrement.
+
+**Web**
+
+Encaissement depuis la fiche de collecte ; **écran de terrain** du collecteur
+répondant à « qui dois-je aller voir ? », toutes collectes confondues, avec le
+téléphone cliquable ; journal des reçus avec annulation motivée ; **« Mes
+cotisations »**, seule page financière ouverte à un membre et qui ne montre que
+lui ; rapport par collecteur pour le trésorier.
+
+**Mobile**
+
+Le scan mène désormais à **« Encaisser »** en premier bouton — c'est le geste
+qui justifiait tout le module QR de la phase 11. Reconnaître quelqu'un puis
+percevoir, sans le chercher dans une liste.
+
+**Ce qui est reporté, explicitement**
+
+La notification de reçu au membre (phase 17) : le canal n'existe pas, et on ne
+simule pas un envoi qui n'a pas lieu. Le reçu, lui, est réel et consultable.
+
+Le solde de caisse est annoncé **`complete: false`** tant que les dépenses ne
+sont pas saisies. Le présenter comme le solde réel du club tromperait le bureau.
+
+**Tests** — 365 backend (39 nouveaux), 65 mobile (4 nouveaux). Un test mobile a
+trouvé un vrai bug : `crypto.randomUUID` détaché de son receveur lève à
+l'exécution, ce qui aurait cassé l'encaissement sur le terrain.
 
 ---
 

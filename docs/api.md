@@ -703,6 +703,99 @@ Dans la plupart des cas, passer le statut à `FORMER` est le geste juste.
 
 ---
 
+## 3 bis. Encaissements — phase 12
+
+Tous les montants sont des **entiers de FCFA**, à l'entrée comme à la sortie.
+Le contrat d'intégrité est [finance.md](finance.md).
+
+### `POST /participations/{uuid}/payments` — collecteur assigné, trésorier, admin
+
+```json
+{
+  "member": "uuid-du-membre",
+  "amount": 5000,
+  "method": "CASH",
+  "reference": "WV-123456",
+  "note": null,
+  "idempotency_key": "b4f1…",
+  "paid_on": "2026-09-01"
+}
+```
+
+`idempotency_key` est **obligatoire**. Le client la fabrique une fois et la
+réutilise à l'identique sur chaque tentative de la même saisie : c'est ce qui
+empêche un double débit quand le réseau lâche entre la requête et la réponse.
+Deux versements volontaires du même montant restent possibles — ils portent
+deux clés différentes.
+
+Le membre est désigné par son **uuid**, jamais par une clé interne. C'est la
+règle générale de cette API, et elle prime sur l'esquisse de `finance.md` §3.1,
+antérieure à cette convention.
+
+| Réponse | Sens |
+|---|---|
+| `201` | encaissement enregistré |
+| `200` avec `meta.replayed: true` | la clé était déjà connue — le reçu existant est renvoyé, rien n'a été écrit |
+| `422 PAYMENT_REFUSED` | montant supérieur au reste dû, collecte non ouverte, membre dispensé |
+| `404 LINE_NOT_FOUND` | ce membre n'est pas rattaché à cette collecte |
+| `403` | collecteur non assigné à cette ligne |
+
+`meta.line` renvoie la dette mise à jour : le collecteur voit immédiatement ce
+qu'il reste à percevoir.
+
+Ne sont **jamais** lus dans la requête : `collected_by`, `paid_amount`,
+`status`, `balance_after`, le solde. Le serveur les détermine (règle I3).
+
+### `GET /participations/{uuid}/payments` — collecteur et au-dessus
+
+Filtres : `member`, `method`, `include_cancelled`, `per_page`. Les annulations
+sont masquées par défaut mais restent atteignables — les cacher tout à fait
+empêcherait de comprendre un écart de caisse.
+
+### `GET /payments/{uuid}` · `POST /payments/{uuid}/cancel` — trésorier, admin
+
+```json
+{ "reason": "Saisi deux fois lors de la sortie du 14 septembre." }
+```
+
+**Un POST, pas un DELETE, et c'est délibéré.** Rien n'est supprimé : une
+écriture de sens inverse est ajoutée au grand livre, le reçu reste consultable
+et porte son motif. Le motif fait dix caractères au minimum — « erreur »
+n'explique rien et ne se vérifie pas en assemblée générale.
+
+Celui qui encaisse ne peut pas annuler : c'est le contrôle élémentaire contre
+le détournement.
+
+### `GET /payments/mine` — tout membre
+
+La **seule** route financière ouverte à un membre ordinaire, et elle ne montre
+que lui : ses dettes, ses reçus, ses totaux. Ni solde de caisse, ni versements
+des autres.
+
+### `GET /members/{uuid}/dues` — collecteur et au-dessus
+
+Ce qu'un membre doit sur les collectes **ouvertes**, avec `can_pay` calculé
+ligne par ligne. C'est ce qui donne son sens au scan du QR Code : reconnaître
+quelqu'un puis encaisser, sans le chercher dans une liste.
+
+### `GET /finance/collections?from=&to=` — trésorier, admin
+
+Qui a encaissé combien, et **combien d'opérations ont été annulées**, comptées
+à part. Ce n'est pas une statistique de confort : c'est le contrôle contre le
+risque F7 (`finance.md` §6). Trente derniers jours par défaut.
+
+### `GET /finance/cash` — trésorier, admin (ou tous si `public_balance`)
+
+Renvoie `balance` (le cache), `derived_balance` (le même solde recalculé depuis
+le grand livre — un écart signale une écriture passée hors du chemin autorisé),
+et **`complete: false`** tant que les dépenses ne sont pas saisies. Aucune
+interface ne doit présenter ce montant comme le solde réel du club.
+
+Il n'existe **aucune** route acceptant un solde en entrée, et il ne doit jamais
+en exister (règle I1).
+
+---
+
 ## 4. Contrôle par rôle
 
 Le middleware `role:` raisonne en **rôle minimum** :
@@ -762,17 +855,6 @@ POST   /participations              { name, expected_amount, due_on, event_id?, 
 GET    /participations/{id}         → attendu / encaissé / reste, par membre
 POST   /participations/{id}/members { member_ids[] }
 GET    /members/resolve/{qr_token}  → identifie un membre depuis son QR Code
-```
-
-### Phase 12 — Paiements
-
-```http
-POST   /participations/{id}/payments
-       { member_id, amount, method, reference?, idempotency_key }
-       → 422 si amount > reste dû  (voir finance.md, invariant I3)
-POST   /payments/{id}/reverse       { reason }   contre-passation, jamais suppression
-GET    /payments?from=&to=&collector_id=&method=
-GET    /me/participations
 ```
 
 ### Phase 13 — Finances

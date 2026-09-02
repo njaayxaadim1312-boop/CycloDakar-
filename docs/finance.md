@@ -1,6 +1,7 @@
 # Module financier — règles d'intégrité
 
-> Implémentation : phases 12 à 14.
+> Implémentation : phase 12 livrée (encaissements, grand livre, caisse) ;
+> phases 13 et 14 à venir (dépenses, journal complet, rapports).
 > Ce document a valeur de **contrat**. Toute évolution du module financier doit s'y conformer
 > ou modifier ce document en premier.
 
@@ -26,6 +27,18 @@ Aucune route de l'API n'accepte un solde en entrée. Il n'existe pas de
 
 `financial_transactions` et `payments` sont **append-only** :
 pas de `deleted_at`, pas d'`UPDATE` du montant, pas de route `DELETE`.
+
+La règle est **exécutable**, pas seulement écrite ici : les modèles
+`FinancialTransaction` et `Payment` lèvent une exception sur toute tentative de
+mise à jour du montant ou de suppression. Un jour, un import ou un correctif
+pressé appellera `->update()` sur ces tables ; il vaut mieux qu'il s'arrête net
+plutôt que de fausser un solde en silence.
+
+Une contre-passation garde la **catégorie** de l'écriture qu'elle annule, bien
+qu'elle soit de sens inverse. C'est indispensable : une annulation
+d'encaissement doit venir se retrancher du poste « Participations », faute de
+quoi le rapport annuel afficherait toujours des recettes dont une partie est
+ressortie de la caisse.
 
 Une erreur se corrige par **contre-passation** : une nouvelle écriture de sens inverse,
 même montant, avec `reverses_transaction_id` renseigné et un `reason` obligatoire.
@@ -72,13 +85,26 @@ En TypeScript, les montants sont typés `type Fcfa = number & { __brand: 'FCFA' 
 `balance_after` est calculé sous verrou (`SELECT ... FOR UPDATE` sur `cash_accounts`) pour que
 deux encaissements simultanés ne produisent pas deux fois le même solde.
 
+**`balance_after` suit l'ordre d'ENREGISTREMENT, pas la date métier.** C'est le solde de la
+caisse au moment où l'écriture a été passée ; il ne se recompose donc que dans l'ordre des
+`id`. Un encaissement saisi le lundi pour une sortie du samedi précédent — cas courant, un
+collecteur ressaisit rarement le soir même — s'insère avant lui par `occurred_on` mais après
+lui par `id`. Conséquence pour le journal de caisse : trié par date métier, la colonne
+« Solde » n'est pas monotone dès qu'une saisie a été antidatée. C'est la réalité d'une caisse
+tenue à la main, pas un défaut à masquer, et `finance:recompute-balance` vérifie la suite dans
+l'ordre d'enregistrement.
+
 ## 3. Les trois chemins vers la caisse
 
 ### 3.1 Encaissement d'une participation
 
 ```text
-POST /api/v1/participations/{id}/payments
-{ member_id, amount, method, reference?, idempotency_key }
+POST /api/v1/participations/{uuid}/payments
+{ member, amount, method, reference?, note?, idempotency_key, paid_on? }
+
+  `member` est l'UUID du membre, et non sa clé interne : aucune clé primaire
+  ne sort de l'API. Cette convention prime sur le `member_id` esquissé ici
+  avant qu'elle ne soit fixée.
 
 DB::transaction:
   0. idempotency_key déjà vue ? → renvoyer le paiement existant, 200, FIN
@@ -91,7 +117,12 @@ DB::transaction:
   6. UPDATE participation_members.paid_amount, status, last_payment_at
   7. UPDATE cash_accounts.current_balance   (cache)
   8. INSERT audit_logs ('payment.created')
-  9. Notification au membre : « Paiement de 5 000 FCFA enregistré »
+  9. Numéro de reçu `RC-2026-000042`, attribué sous le même verrou que le solde
+     — sans quoi deux encaissements simultanés liraient le même maximum et l'un
+     des deux échouerait sur l'index unique
+ 10. PHASE 17 — notification « Paiement de 5 000 FCFA enregistré ». Le canal
+     (push, SMS) n'existe pas encore ; le reçu, lui, est réel et consultable par
+     le membre dans « Mes cotisations ».
 ```
 
 Statut recalculé, jamais reçu du client :

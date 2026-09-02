@@ -294,6 +294,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | consultable, marque annule. Un verbe DELETE laisserait croire le
         | contraire a quiconque lit la liste des routes (docs/finance.md, I2).
         */
+        // Ce qu'un membre doit, vu par un collecteur. Complete le scan du QR
+        // Code : on reconnait quelqu'un, et on voit quoi lui demander.
+        Route::get('/members/{member}/dues', [PaymentController::class, 'memberDues'])
+            ->name('members.dues');
+
         Route::prefix('payments')->name('payments.')->group(function (): void {
             Route::get('/mine', [PaymentController::class, 'mine'])->name('mine');
             Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');

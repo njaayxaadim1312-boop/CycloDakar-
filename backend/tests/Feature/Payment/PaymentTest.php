@@ -458,4 +458,63 @@ final class PaymentTest extends TestCase
             ->assertNotFound()
             ->assertJsonPath('code', 'LINE_NOT_FOUND');
     }
+
+    /* ---------------------------------------------------------------------- */
+    /* Ce qu'un membre doit, vu par un collecteur — le sens du scan QR        */
+    /* ---------------------------------------------------------------------- */
+
+    #[Test]
+    public function le_collecteur_voit_ce_que_le_membre_doit_apres_un_scan(): void
+    {
+        [, $ligne, $collecteur] = $this->scenario();
+
+        $reponse = $this->actingAs_($collecteur)
+            ->getJson("/api/v1/members/{$ligne->member->uuid}/dues")
+            ->assertOk()
+            ->assertJsonPath('meta.remaining_amount', 5_000)
+            ->assertJsonPath('data.0.can_pay', true);
+
+        $this->assertCount(1, $reponse->json('data'));
+    }
+
+    #[Test]
+    public function une_dette_confiee_a_un_autre_collecteur_est_visible_mais_pas_encaissable(): void
+    {
+        // Le droit vient du SERVEUR, ligne par ligne. La ligne reste visible —
+        // un collecteur peut avoir besoin de renseigner un membre — mais
+        // `can_pay` dit clairement qu'il n'a pas a encaisser celle-ci.
+        [, $ligne] = $this->scenario();
+
+        $etranger = $this->user(UserRole::Collector);
+
+        $this->actingAs_($etranger)
+            ->getJson("/api/v1/members/{$ligne->member->uuid}/dues")
+            ->assertOk()
+            ->assertJsonPath('data.0.can_pay', false);
+    }
+
+    #[Test]
+    public function une_collecte_non_ouverte_n_apparait_pas_dans_les_dettes(): void
+    {
+        // Un collecteur n'a que faire de l'historique : il a besoin de savoir
+        // quoi demander MAINTENANT.
+        [$participation, $ligne, $collecteur] = $this->scenario();
+        $participation->update(['status' => ParticipationStatus::Closed]);
+
+        $this->actingAs_($collecteur)
+            ->getJson("/api/v1/members/{$ligne->member->uuid}/dues")
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.remaining_amount', 0);
+    }
+
+    #[Test]
+    public function un_simple_membre_ne_consulte_pas_les_dettes_des_autres(): void
+    {
+        [, $ligne] = $this->scenario();
+
+        $this->actingAs_($this->user(UserRole::Member))
+            ->getJson("/api/v1/members/{$ligne->member->uuid}/dues")
+            ->assertForbidden();
+    }
 }

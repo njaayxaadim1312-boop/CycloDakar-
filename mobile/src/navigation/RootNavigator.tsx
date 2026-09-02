@@ -11,6 +11,7 @@ import { EventsScreen } from '../screens/events/EventsScreen'
 import { HomeScreen } from '../screens/HomeScreen'
 import { MemberDetailScreen } from '../screens/MemberDetailScreen'
 import { MembersScreen } from '../screens/MembersScreen'
+import { MemberDuesScreen } from '../screens/MemberDuesScreen'
 import { ScanScreen } from '../screens/ScanScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { TrackingNavigator } from './TrackingNavigator'
@@ -52,6 +53,8 @@ export type MembersStackParams = {
   MembersList: undefined
   MemberDetail: { uuid: string }
   Scan: undefined
+  /** Ce qu'un membre doit, et l'encaissement — PHASE 12. */
+  MemberDues: { uuid: string }
 }
 
 export type ProfileStackParams = {
@@ -148,12 +151,23 @@ function MembersNavigator() {
       </MembersStack.Screen>
 
       {/* Le scan vit dans la pile des membres : il sert a en identifier un,
-          et son resultat mene a sa fiche. */}
+          et son resultat mene soit a sa fiche, soit — c'est ce qui justifie
+          tout le module — directement a l'encaissement. */}
       <MembersStack.Screen name="Scan">
         {({ navigation }) => (
           <ScanScreen
             onBack={() => navigation.goBack()}
             onOpenMember={(uuid) => navigation.replace('MemberDetail', { uuid })}
+            onCollect={(uuid) => navigation.replace('MemberDues', { uuid })}
+          />
+        )}
+      </MembersStack.Screen>
+
+      <MembersStack.Screen name="MemberDues">
+        {({ navigation, route }) => (
+          <MemberDuesScreen
+            uuid={route.params.uuid}
+            onBack={() => navigation.goBack()}
           />
         )}
       </MembersStack.Screen>

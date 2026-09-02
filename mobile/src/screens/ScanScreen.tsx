@@ -20,6 +20,8 @@ import { useTheme } from '../theme/useTheme'
 interface ScanScreenProps {
   onBack: () => void
   onOpenMember: (uuid: string) => void
+  /** Mene directement a ce que ce membre doit — PHASE 12. */
+  onCollect: (uuid: string) => void
 }
 
 /**
@@ -42,7 +44,7 @@ interface ScanScreenProps {
  * 3. **Un membre inactif est signalé en rouge.** On ne réclame pas de
  *    cotisation à quelqu'un qui a quitté le club.
  */
-export function ScanScreen({ onBack, onOpenMember }: ScanScreenProps) {
+export function ScanScreen({ onBack, onOpenMember, onCollect }: ScanScreenProps) {
   const { colors, isDark } = useTheme()
   const [permission, requestPermission] = useCameraPermissions()
 
@@ -184,13 +186,24 @@ export function ScanScreen({ onBack, onOpenMember }: ScanScreenProps) {
             </View>
 
             <View style={styles.actions}>
-              <Button title="Voir la fiche" onPress={() => onOpenMember(result.uuid)} />
+              {/* « Encaisser » EN PREMIER, et c'est voulu : dans neuf cas sur
+                  dix, on scanne pour percevoir une cotisation, pas pour
+                  consulter une fiche. C'est le geste qui justifie tout ce
+                  module — reconnaitre quelqu'un puis encaisser, sans le
+                  chercher dans une liste, au bord d'une route.
+
+                  Un membre inactif n'y a pas droit : on ne reclame pas de
+                  cotisation a quelqu'un qui a quitte le club. */}
+              {result.is_active && (
+                <Button title="Encaisser" onPress={() => onCollect(result.uuid)} />
+              )}
+              <Button
+                title="Voir la fiche"
+                variant="ghost"
+                onPress={() => onOpenMember(result.uuid)}
+              />
               <Button title="Scanner le suivant" onPress={scanNext} variant="ghost" />
             </View>
-
-            {/* PHASE 12 — c'est ici que viendra « Encaisser », le geste qui
-                justifie tout ce module : scanner puis saisir un paiement sans
-                chercher le membre dans une liste. */}
           </>
         )}
 
