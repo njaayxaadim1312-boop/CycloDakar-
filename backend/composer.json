@@ -11,6 +11,7 @@
         "laravel/framework": "^13.17",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "phpoffice/phpspreadsheet": "*",
         "simplesoftwareio/simple-qrcode": "^4.2"
     },
     "require-dev": {

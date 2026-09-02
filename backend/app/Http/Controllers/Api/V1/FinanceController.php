@@ -18,6 +18,8 @@ use App\Models\Payment;
 use App\Models\TransactionCategory;
 use App\Services\AuditLogger;
 use App\Services\Finance\CashLedger;
+use App\Services\Finance\FinancialReport;
+use App\Services\Finance\ReportExporter;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -358,6 +360,65 @@ final class FinanceController extends Controller
             new TransactionResource($ecriture->load(['category', 'event', 'author'])),
             status: 201,
         );
+    }
+
+    /**
+     * Rapport financier d'une période, dans le format demandé.
+     *
+     * QUATRE FORMATS, QUATRE USAGES — ce n'est pas de la redondance.
+     *
+     * `json` alimente l'écran. `pdf` est la pièce qu'on signe et qu'on
+     * distribue en assemblée : elle ne se retouche pas. `xlsx` se retravaille —
+     * le trésorier y ajoute une colonne, trie, refait ses totaux. `csv`
+     * s'importe ailleurs, et c'est le format qu'on regrette de ne pas avoir le
+     * jour où il faut sortir des données d'une application.
+     *
+     * LA PÉRIODE EST BORNÉE À DEUX ANS, ET C'EST DÉLIBÉRÉ.
+     *
+     * Un rapport « depuis toujours » se génère en mémoire, ligne par ligne, et
+     * finirait par faire tomber la requête au moment précis où l'on en a le
+     * plus besoin — la veille d'une assemblée. `docs/finance.md` prévoit une
+     * génération asynchrone avec notification de disponibilité : elle attend
+     * la phase 17, qui livre les notifications. D'ici là, mieux vaut une borne
+     * claire qu'un échec obscur.
+     */
+    public function reports(
+        Request $request,
+        FinancialReport $rapports,
+        ReportExporter $exporteur,
+    ): mixed {
+        $this->authorize('viewBalance', Payment::class);
+
+        $filtres = $request->validate([
+            'period' => ['nullable', Rule::in(['day', 'week', 'month', 'year', 'custom'])],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'format' => ['nullable', Rule::in(['json', 'pdf', 'xlsx', 'csv'])],
+        ]);
+
+        [$du, $au] = FinancialReport::resolvePeriod(
+            $filtres['period'] ?? 'month',
+            $filtres['from'] ?? null,
+            $filtres['to'] ?? null,
+        );
+
+        if (Carbon::parse($du)->diffInDays(Carbon::parse($au)) > 800) {
+            return ApiResponse::error(
+                message: 'La période demandée dépasse deux ans. Découpez-la : un rapport '
+                    .'trop large ne se génère pas de façon fiable.',
+                status: 422,
+                code: 'PERIOD_TOO_WIDE',
+            );
+        }
+
+        $rapport = $rapports->build($du, $au);
+
+        return match ($filtres['format'] ?? 'json') {
+            'pdf' => $exporteur->pdf($rapport),
+            'xlsx' => $exporteur->xlsx($rapport),
+            'csv' => $exporteur->csv($rapport),
+            default => ApiResponse::ok($rapport),
+        };
     }
 
     /** Les postes du grand livre, pour alimenter les listes déroulantes. */

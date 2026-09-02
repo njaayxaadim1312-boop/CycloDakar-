@@ -60,7 +60,7 @@ const FINANCE: RoleCode[] = ['TREASURER', 'ADMIN', 'SUPER_ADMIN']
 const COLLECT: RoleCode[] = ['COLLECTOR', 'TREASURER', 'ADMIN', 'SUPER_ADMIN']
 
 /** Dernière phase effectivement livrée — à incrémenter à chaque phase finie. */
-export const DELIVERED_THROUGH_PHASE = 13
+export const DELIVERED_THROUGH_PHASE = 14
 
 /* -------------------------------------------------------------------------- */
 /* Menu principal — l'exercice, et rien d'autre                               */
@@ -253,7 +253,7 @@ export const managementSections: NavSection[] = [
         phase: 14,
         roles: FINANCE,
         summary:
-          'Rapports par période avec ventilation par catégorie et export PDF, Excel ou CSV.',
+          "Jour, semaine, mois, année ou période libre. Le PDF se signe et se distribue, l'Excel se retravaille, le CSV s'importe ailleurs — l'écran montre exactement ce que le fichier contiendra.",
       },
     ],
   },

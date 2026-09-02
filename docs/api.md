@@ -957,12 +957,6 @@ POST   /participations/{id}/members { member_ids[] }
 GET    /members/resolve/{qr_token}  → identifie un membre depuis son QR Code
 ```
 
-### Phase 14 — Rapports
-
-```http
-GET    /finance/reports?period=day|week|month|year|custom&from=&to=&format=json|pdf|xlsx|csv
-```
-
 ### Phase 15 — Vidéo
 
 ```http

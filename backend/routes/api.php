@@ -340,6 +340,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             // un don ferait perdre la trace du don.
             Route::post('/income', [FinanceController::class, 'storeIncome'])
                 ->name('income');
+
+            // PHASE 14 — rapports. Le format demande decide de la reponse :
+            // json pour l'ecran, pdf pour l'assemblee, xlsx pour retravailler,
+            // csv pour importer ailleurs.
+            Route::get('/reports', [FinanceController::class, 'reports'])->name('reports');
         });
 
         /*
@@ -389,7 +394,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}
-        | PHASE 14 — /finance/reports
         | PHASE 15 — /activities/{id}/video, /video-jobs/{id}
         | PHASE 16 — /challenges, /leaderboard
         | PHASE 17 — /notifications

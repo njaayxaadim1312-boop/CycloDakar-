@@ -1,6 +1,7 @@
 import { api, getData } from '@/lib/api'
 import type {
   CashDashboard,
+  FinancialReport,
   Expense,
   ExpenseAttachment,
   ExpenseInput,
@@ -154,4 +155,72 @@ export async function createIncome(input: IncomeInput): Promise<LedgerEntry> {
   const response = await api.post<{ data: LedgerEntry }>('/finance/income', input)
 
   return response.data.data
+}
+
+/* -------------------------------------------------------------- rapports --- */
+
+export type ReportPeriod = 'day' | 'week' | 'month' | 'year' | 'custom'
+export type ReportFormat = 'pdf' | 'xlsx' | 'csv'
+
+export interface ReportRange {
+  period: ReportPeriod
+  from?: string
+  to?: string
+}
+
+export function fetchReport(range: ReportRange): Promise<FinancialReport> {
+  // `getData` prend les paramètres directement, pas un objet de config.
+  return getData<FinancialReport>('/finance/reports', cleanParams(range))
+}
+
+/**
+ * Télécharge un rapport dans un format de fichier.
+ *
+ * **Un simple `<a href>` ne peut pas marcher ici, et c'est le piège.**
+ *
+ * La session vit dans un en-tête `Authorization`, pas dans un cookie : une
+ * navigation ordinaire partirait sans jeton et recevrait un 401. On récupère
+ * donc le fichier par la même couche que le reste de l'API, puis on fabrique
+ * une URL locale (`blob:`) le temps d'un clic simulé.
+ *
+ * L'URL est révoquée aussitôt : chaque `createObjectURL` retient son contenu en
+ * mémoire jusqu'à la fermeture de l'onglet, et un trésorier qui exporte dix
+ * rapports d'affilée finirait par en garder dix en mémoire.
+ */
+export async function downloadReport(range: ReportRange, format: ReportFormat): Promise<void> {
+  const response = await api.get('/finance/reports', {
+    params: { ...cleanParams(range), format },
+    responseType: 'blob',
+  })
+
+  const nom = extractFilename(response.headers) ?? `cyclo-dakar-rapport.${format}`
+  const url = URL.createObjectURL(response.data as Blob)
+
+  const lien = document.createElement('a')
+  lien.href = url
+  lien.download = nom
+  document.body.append(lien)
+  lien.click()
+  lien.remove()
+
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Retrouve le nom de fichier choisi par le serveur.
+ *
+ * On le préfère à un nom inventé côté client : c'est le serveur qui connaît la
+ * période réellement retenue — « ce mois-ci » n'a pas la même signification le
+ * 1er et le 30.
+ */
+function extractFilename(headers: unknown): string | null {
+  const disposition = (headers as Record<string, string> | undefined)?.[
+    'content-disposition'
+  ]
+
+  if (typeof disposition !== 'string') return null
+
+  const correspondance = /filename="?([^";]+)"?/.exec(disposition)
+
+  return correspondance?.[1] ?? null
 }

@@ -9,11 +9,25 @@ use App\Enums\ActivityVisibility;
 use App\Enums\EventStatus;
 use App\Enums\RegistrationStatus;
 use App\Enums\Sport;
+use App\Enums\ParticipationStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\TransactionDirection;
+use App\Enums\TransactionSource;
+use App\Enums\UserRole;
 use App\Models\Activity;
+use App\Models\CashAccount;
+use App\Models\Participation;
+use App\Models\ParticipationMember;
+use App\Models\Payment;
+use App\Models\TransactionCategory;
+use App\Models\User;
+use App\Services\Finance\CashLedger;
+use App\Services\Finance\ExpenseService;
+use App\Services\Finance\PaymentService;
+use Illuminate\Support\Facades\DB;
 use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\Member;
-use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -39,7 +53,7 @@ final class DemoDataCommand extends Command
         {--force : Autoriser hors environnement local}
         {--fresh : Supprimer les données de démonstration existantes}';
 
-    protected $description = 'Crée des sorties et des événements de démonstration';
+    protected $description = 'Crée des sorties, des événements et un jeu de caisse de démonstration';
 
     /** Le compte avec lequel on regardera le résultat. */
     private const SHOWCASE_EMAIL = 'membre@cyclodakar.sn';
@@ -116,10 +130,12 @@ final class DemoDataCommand extends Command
 
         $this->createActivities($members);
         $this->createEvents($members);
+        $this->createFinance($members);
 
         $this->newLine();
         $this->line('  <fg=green>✔</> Jeu de démonstration en place.');
         $this->line('     Connectez-vous avec <options=bold>'.self::SHOWCASE_EMAIL.'</> pour voir les anneaux remplis.');
+        $this->line('     Le trésorier verra une caisse alimentée : collecte, encaissements, dépenses, don.');
         $this->newLine();
 
         return self::SUCCESS;
@@ -135,7 +151,169 @@ final class DemoDataCommand extends Command
         $removed = Activity::query()->where('points_count', 0)->forceDelete();
         $events = Event::query()->forceDelete();
 
+        /*
+         | LA CAISSE N'EST PAS EFFACÉE, ET C'EST DÉLIBÉRÉ.
+         |
+         | Le grand livre est append-only : une écriture ne se supprime pas,
+         | elle se contre-passe (règle I2 de docs/finance.md). Une commande de
+         | démonstration qui viderait `financial_transactions` apprendrait
+         | exactement le mauvais réflexe, et rien ne garantit qu'elle ne serait
+         | pas lancée un jour sur une base contenant de vrais encaissements.
+         |
+         | `cyclo:demo --fresh` relancé deux fois ajoute donc une seconde
+         | collecte plutôt que de remplacer la première. C'est plus honnête, et
+         | cela reste lisible : chaque collecte porte sa date dans son nom.
+         */
         $this->line("  <fg=gray>Supprimé : {$removed} sortie(s), {$events} événement(s).</>");
+        $this->line('  <fg=gray>La caisse est conservée : le grand livre ne se supprime pas.</>');
+    }
+
+
+    /**
+     * Une caisse qui ressemble à un vrai mois de club.
+     *
+     * Sans elle, les écrans de trésorerie s'ouvrent vides : on ne peut ni
+     * juger la lisibilité d'un journal, ni vérifier qu'un rapport s'imprime
+     * correctement, ni voir à quoi ressemble un reste à percevoir. Un module
+     * financier qu'on ne peut pas REGARDER ne se teste pas.
+     *
+     * Le jeu passe par les SERVICES réels — `PaymentService`, `ExpenseService`,
+     * `CashLedger` — et jamais par des insertions directes. Une démonstration
+     * qui court-circuiterait le verrou de caisse ou le calcul de
+     * `balance_after` produirait des données que le code de production ne sait
+     * pas produire, et le premier `finance:recompute-balance` crierait.
+     *
+     * Tout n'est pas soldé : quelques membres restent débiteurs, une dépense
+     * attend son approbation. Un jeu de démonstration où tout est parfait ne
+     * montre aucun des états qu'on a écrits pour les cas imparfaits.
+     *
+     * @param  \Illuminate\Support\Collection<int, Member>  $members
+     */
+    private function createFinance($members): void
+    {
+        if (CashAccount::query()->where('is_default', true)->doesntExist()) {
+            $this->line('  <fg=gray>Aucune caisse configurée : `db:seed --class=FinanceSeeder`.</>');
+
+            return;
+        }
+
+        $tresorier = User::query()->where('email', 'tresorier@cyclodakar.sn')->first()
+            ?? User::query()->where('role', UserRole::SuperAdmin)->first();
+
+        $collecteur = User::query()->where('email', 'collecteur@cyclodakar.sn')->first()
+            ?? $tresorier;
+
+        if ($tresorier === null) {
+            return;
+        }
+
+        // Les services attendent une session : ils lisent `auth()->id()` pour
+        // `created_by`, et c'est la règle I3 — jamais le corps de la requête.
+        auth()->setUser($tresorier);
+
+        $ledger = app(CashLedger::class);
+        $paiements = app(PaymentService::class);
+        $depenses = app(ExpenseService::class);
+
+        /*
+         | Les dates restent DANS LE MOIS COURANT.
+         |
+         | Sans ce garde-fou, un jeu lancé le 2 du mois plaçait ses opérations
+         | huit jours plus tôt, donc en août — et le rapport « ce mois-ci »,
+         | qui est celui qu'on ouvre en premier, s'affichait vide. Le rapport
+         | avait raison ; c'est la démonstration qui ne montrait rien.
+         */
+        $jour = fn (int $recul) => now()->subDays($recul)
+            ->max(now()->startOfMonth())
+            ->toDateString();
+
+        /* --- Une collecte, et des encaissements partiels ------------------- */
+
+        $participation = Participation::create([
+            'name' => 'Sortie Lac Rose — '.now()->translatedFormat('F Y'),
+            'description' => 'Transport, ravitaillement et assistance pour la sortie du mois.',
+            'expected_amount' => 5_000,
+            'starts_on' => now()->startOfMonth()->toDateString(),
+            'due_on' => now()->endOfMonth()->toDateString(),
+            'status' => ParticipationStatus::Open,
+            'created_by' => $tresorier->id,
+        ]);
+
+        $lignes = [];
+
+        foreach ($members as $membre) {
+            $lignes[] = ParticipationMember::create([
+                'participation_id' => $participation->id,
+                'member_id' => $membre->id,
+                'expected_amount' => 5_000,
+                'assigned_collector_id' => $collecteur?->id,
+            ]);
+        }
+
+        auth()->setUser($collecteur ?? $tresorier);
+
+        // Trois profils, parce que ce sont les trois qu'on veut voir à l'écran :
+        // soldé, partiel, et pas encore payé.
+        foreach ($lignes as $index => $ligne) {
+            $montant = match ($index % 3) {
+                0 => 5_000,
+                1 => 2_000,
+                default => 0,
+            };
+
+            if ($montant === 0) {
+                continue;
+            }
+
+            $paiements->collect(
+                line: $ligne,
+                amount: $montant,
+                method: $index % 2 === 0 ? PaymentMethod::Cash : PaymentMethod::Wave,
+                idempotencyKey: 'demo-'.$participation->id.'-'.$ligne->id,
+                collector: $collecteur ?? $tresorier,
+                reference: $index % 2 === 0 ? null : 'WV-'.random_int(100000, 999999),
+                paidOn: $jour(random_int(1, 6)),
+            );
+        }
+
+        /* --- Un don, et des dépenses ------------------------------------- */
+
+        auth()->setUser($tresorier);
+
+        DB::transaction(fn () => $ledger->record(
+            account: CashAccount::default(),
+            direction: TransactionDirection::In,
+            amount: 150_000,
+            label: 'Don de la mairie de Dakar',
+            sourceType: TransactionSource::Manual,
+            category: TransactionCategory::byCode('DON'),
+            occurredOn: $jour(8),
+        ));
+
+        // Sous le seuil : approuvée immédiatement, et l'écran le montre.
+        $depenses->create([
+            'transaction_category_id' => TransactionCategory::byCode('RAVITAILLEMENT')?->id,
+            'amount' => 18_000,
+            'label' => 'Eau et fruits — sortie du dimanche',
+            'supplier' => 'Boutique Ouakam',
+            'spent_on' => $jour(4),
+        ], $tresorier);
+
+        // Au-dessus du seuil : elle RESTE en attente. C'est l'état qu'il faut
+        // pouvoir regarder — l'engagé qui n'est pas encore sorti de la caisse.
+        $depenses->create([
+            'transaction_category_id' => TransactionCategory::byCode('TRANSPORT')?->id,
+            'amount' => 80_000,
+            'label' => 'Bus pour le Lac Rose',
+            'supplier' => 'Dakar Dem Dikk',
+            'spent_on' => $jour(2),
+        ], $tresorier);
+
+        $solde = CashAccount::default()->fresh()->current_balance;
+
+        $this->line('  <fg=green>✔</> Caisse : 1 collecte, '
+            .Payment::count().' encaissement(s), 1 don, 2 dépenses. Solde '
+            .number_format($solde, 0, ',', ' ').' FCFA.');
     }
 
     /**

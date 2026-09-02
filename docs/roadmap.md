@@ -643,10 +643,72 @@ l'exécution.
 
 ---
 
-## ⏳ Phase 14 — Rapports financiers
+## ✅ Phase 14 — Rapports financiers *(terminée)*
 
-Rapports jour / semaine / mois / année / période libre, ventilation par catégorie,
-export PDF, Excel et CSV, génération asynchrone pour les gros volumes.
+**L'écran montre exactement ce que le fichier contiendra.** C'est la seule règle
+d'ergonomie qui compte ici : un rapport téléchargé sans avoir pu être regardé,
+on l'ouvre, on découvre qu'il ne couvre pas la bonne période, et on recommence —
+la veille d'une assemblée générale. Le même appel sert donc l'affichage et les
+trois formats de fichier.
+
+**Trois formats, trois usages, et ce n'est pas de la redondance**
+
+Le PDF se signe et se distribue : il ne se retouche pas. L'Excel se
+retravaille — le trésorier y ajoute une colonne, trie, refait ses totaux — et
+ses montants sont donc de vrais NOMBRES, sans quoi la première somme faite dans
+le tableur renverrait zéro. Le CSV s'importe ailleurs, et c'est le format qu'on
+regrette de ne pas avoir le jour où il faut sortir des données d'une
+application.
+
+Deux détails d'encodage décident de tout pour le CSV : la BOM UTF-8, sans
+laquelle Excel rend « Ravitaillement » illisible, et le point-virgule comme
+séparateur, la virgule étant le séparateur décimal sur un Windows français. Un
+test vérifie les deux, parce qu'ils ne se voient pas à la relecture.
+
+**Ce qui rend un rapport STABLE**
+
+Le solde d'ouverture suit la **date métier**, pas la saisie. Une opération de
+septembre saisie en octobre appartient à septembre : elle entre dans le solde
+d'ouverture d'octobre, pas dans ses recettes. C'est la seule définition qui
+permette de ressortir en décembre le rapport de septembre et d'y retrouver le
+même chiffre. On ne lit donc pas `balance_after` ici, alors que le journal de
+caisse le fait : cette colonne répond à une autre question.
+
+**Ce qui n'entre dans aucun total**
+
+L'engagé, daté du jour d'édition — une dépense en attente n'a pas de date de
+sortie. Et les collectes, volontairement hors période : une créance n'appartient
+pas à un mois, elle existe tant qu'elle n'est pas réglée. Le rapport le dit
+explicitement à chaque fois plutôt que de laisser deviner.
+
+**La borne des deux ans**
+
+Un rapport « depuis toujours » se génère ligne par ligne en mémoire et finirait
+par faire tomber la requête au moment où l'on en a le plus besoin. La génération
+asynchrone prévue par `finance.md` attend la phase 17, qui livre les
+notifications. D'ici là, une borne annoncée coûte moins cher qu'un échec obscur.
+
+**Le jeu de démonstration couvre enfin la caisse**
+
+Les écrans de trésorerie s'ouvraient vides : impossible de juger la lisibilité
+d'un journal ou de vérifier qu'un rapport s'imprime. `cyclo:demo` crée
+désormais une collecte avec des encaissements partiels, un don et deux dépenses
+— dont une au-dessus du seuil, qui reste en attente, parce qu'un jeu où tout est
+parfait ne montre aucun des états écrits pour les cas imparfaits.
+
+Il passe par les **services réels**, jamais par des insertions directes : une
+démonstration qui court-circuiterait le verrou de caisse produirait des données
+que le code de production ne sait pas produire. Et il n'efface JAMAIS le grand
+livre, même avec `--fresh` : une commande qui viderait `financial_transactions`
+apprendrait exactement le mauvais réflexe.
+
+**Vérifié**
+
+406 tests backend (10 pour cette phase). Les exports ne sont pas seulement
+« générés » : le `.xlsx` est **relu** par la bibliothèque pour vérifier que les
+montants sont des nombres et non du texte, le PDF est contrôlé sur sa signature
+et sa taille, et le CSV sur sa BOM et son séparateur. Les fichiers ont aussi été
+téléchargés depuis le serveur réel et ouverts.
 
 ---
 

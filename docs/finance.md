@@ -1,8 +1,7 @@
 # Module financier — règles d'intégrité
 
-> Implémentation : phases 12 et 13 livrées (encaissements, grand livre,
-> dépenses, journal de caisse, tableau de bord). Phase 14 à venir (rapports
-> exportables).
+> Implémentation : phases 12, 13 et 14 livrées — encaissements, grand livre,
+> dépenses, journal de caisse, tableau de bord et rapports exportables.
 > Ce document a valeur de **contrat**. Toute évolution du module financier doit s'y conformer
 > ou modifier ce document en premier.
 
@@ -203,8 +202,29 @@ Contenu : total recettes, total dépenses, solde d'ouverture et de clôture, ven
 catégorie (recettes et dépenses), participations attendues / encaissées / restant dû,
 courbe d'évolution du solde, liste des opérations.
 
-Génération PDF : `barryvdh/laravel-dompdf`. Excel : `maatwebsite/excel`.
-Les exports lourds passent par un job en file d'attente et une notification de disponibilité.
+Génération PDF : `barryvdh/laravel-dompdf`. Excel : **`phpoffice/phpspreadsheet`**
+directement, et non `maatwebsite/excel` : ce dernier n'est qu'une façade Laravel
+autour du premier, et le rapport n'a pas besoin de ses conventions
+(collections, exports en classes). Une dépendance de moins à suivre.
+
+**Trois formats, trois usages** — ce n'est pas de la redondance. Le PDF se signe
+et se distribue en assemblée ; l'Excel se retravaille, et ses montants doivent
+donc être de vrais NOMBRES, sans quoi la première somme faite dans le tableur
+renverrait zéro ; le CSV s'importe ailleurs.
+
+Deux détails d'encodage décident de tout pour le CSV : la **BOM UTF-8**, sans
+laquelle Excel lit le fichier en Windows-1252 et rend les accents illisibles, et
+le **point-virgule** comme séparateur, la virgule étant le séparateur décimal
+sur un Windows français.
+
+**Le solde d'ouverture d'un rapport suit la date MÉTIER**, pas la date de
+saisie : c'est ce qui rend un rapport stable dans le temps. On ne lit donc pas
+`balance_after` pour le calculer, alors que le journal de caisse, lui, le fait —
+cette colonne répond à une autre question (§2).
+
+La génération asynchrone avec notification de disponibilité attend la phase 17,
+qui livre les notifications. D'ici là, la période est bornée à deux ans : un
+échec obscur la veille d'une assemblée coûte plus cher qu'une borne annoncée.
 
 ## 6. Audit
 

@@ -1028,3 +1028,58 @@ export interface CashDashboard {
   /** Ce qui reste à percevoir sur les collectes ouvertes. Pas de la caisse. */
   receivable: Fcfa
 }
+
+/**
+ * Un rapport financier de période.
+ *
+ * Tout y est CALCULÉ depuis le grand livre, rien n'est stocké : un rapport qui
+ * conserverait ses totaux finirait par contredire le journal — après une
+ * contre-passation, par exemple — et deux chiffres qui se contredisent sur de
+ * l'argent, c'est la confiance du bureau perdue.
+ */
+export interface FinancialReport {
+  period: { from: string; to: string; label: string }
+  account: { name: string }
+
+  summary: {
+    /** Solde à la veille du premier jour, en DATE MÉTIER. */
+    opening_balance: Fcfa
+    income: Fcfa
+    expenses: Fcfa
+    net: Fcfa
+    closing_balance: Fcfa
+    /**
+     * Dépenses engagées à la date d'ÉDITION, pas à la fin de la période.
+     *
+     * Une dépense en attente n'a pas de date de sortie — elle n'a pas encore
+     * eu lieu. La rattacher à la période donnerait un chiffre qui changerait
+     * chaque fois qu'on ressort le rapport.
+     */
+    committed_today: Fcfa
+  }
+
+  by_category: {
+    income: Array<{ code: string; name: string; amount: Fcfa; operations: number }>
+    expenses: Array<{ code: string; name: string; amount: Fcfa; operations: number }>
+  }
+
+  /** Situation des collectes à la date d'édition, volontairement hors période. */
+  participations: { expected: Fcfa; collected: Fcfa; remaining: Fcfa }
+
+  /** Un point par jour où il s'est passé quelque chose. */
+  daily: Array<{ date: string; income: Fcfa; expenses: Fcfa; balance: Fcfa }>
+
+  entries: Array<{
+    date: string
+    label: string
+    category: string
+    direction: TransactionDirectionCode
+    income: Fcfa
+    expense: Fcfa
+    balance_after: Fcfa
+    author: string
+    reason: string | null
+  }>
+
+  generated_at: string
+}

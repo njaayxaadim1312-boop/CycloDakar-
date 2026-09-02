@@ -12,6 +12,7 @@ import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { CashPage } from '@/pages/finance/CashPage'
 import { ExpensesPage } from '@/pages/finance/ExpensesPage'
 import { LedgerPage } from '@/pages/finance/LedgerPage'
+import { ReportsPage } from '@/pages/finance/ReportsPage'
 import { CollectionsPage } from '@/pages/payments/CollectionsPage'
 import { CollectPage } from '@/pages/payments/CollectPage'
 import { MyDuesPage } from '@/pages/payments/MyDuesPage'
@@ -89,6 +90,9 @@ const IMPLEMENTED = new Set([
   '/finance',
   '/finance/expenses',
   '/finance/transactions',
+
+  // PHASE 14
+  '/finance/reports',
 ])
 
 export default function App() {
@@ -162,6 +166,11 @@ export default function App() {
           <Route path="/finance" element={<CashPage />} />
           <Route path="/finance/expenses" element={<ExpensesPage />} />
           <Route path="/finance/transactions" element={<LedgerPage />} />
+
+          {/* Rapports — PHASE 14. L'ecran montre exactement ce que l'export
+              contiendra : un rapport telecharge sans avoir pu etre regarde se
+              redecouvre a l'ouverture, la veille d'une assemblee. */}
+          <Route path="/finance/reports" element={<ReportsPage />} />
 
           <Route path="/participations" element={<ParticipationsPage />} />
           <Route path="/participations/nouvelle" element={<ParticipationFormPage />} />
