@@ -349,3 +349,29 @@ Le serveur utilisait `min_distance_m` par sport, les clients gardaient un
 `minSegmentM: 1` hérité. Ils sont désormais alignés — cyclisme 5 m, course et
 randonnée 3 m, marche 8 m — parce qu'un affichage en direct qui diverge du
 calcul final fait douter du chiffre.
+
+## La limite de l'instrument
+
+**Un aller-retour de moins d'une quinzaine de mètres n'est pas mesurable.**
+
+Ce n'est pas un réglage à corriger, et il vaut mieux le dire une fois pour
+toutes. Trois essais réels, conservés en fixtures dans
+`backend/tests/Fixtures/traces/`, le montrent :
+
+| Essai | Points | Durée | Chemin brut | Excursion max | Précision | Mesuré |
+|---|---|---|---|---|---|---|
+| `marche-aller-retour-13m` | 16 | 67 s | 35,1 m | 12,7 m | 4–8 m | 0 m |
+| `marche-aller-retour-10m` | 24 | 96 s | 43,5 m | 9,7 m | 4–8 m | 0 m |
+| `marche-sur-place-7m` | 40 | 90 s | 38,1 m | 6,8 m | 4–8 m | 0 m |
+
+Le « chemin brut » est la somme des écarts point à point. Il fait 35 à 43 m —
+mais l'excursion maximale depuis le départ n'atteint jamais 13 m, pour une
+incertitude annoncée de 4 à 8 m. La personne a fait quelques pas et est revenue,
+dans un rayon à peine plus grand que l'erreur de son propre récepteur.
+
+Compter ces mètres reviendrait à compter le tremblement — précisément le défaut
+d'origine, qui affichait 209 m à l'arrêt complet et 135 m pour 72 m réels.
+
+**Pour éprouver la marche, il faut marcher EN LIGNE, sur cinquante mètres au
+moins.** Un aller-retour ne convient pas : l'algorithme mesure l'éloignement
+depuis une ancre, et revenir à son point de départ annule cet éloignement.

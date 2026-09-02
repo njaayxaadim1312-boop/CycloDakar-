@@ -929,10 +929,97 @@ compte super administrateur est perdu.
 
 ---
 
-## ⏳ Phase 18 — Tests
+## ✅ Phase 18 — Tests *(terminée)*
 
-Tests unitaires et d'intégration. Priorité absolue : l'algorithme GPS (sur traces
-fixtures réelles) et les cinq invariants financiers.
+Les deux priorités de la phase étaient nommées : l'algorithme GPS sur traces
+réelles, et les cinq invariants financiers. Les voici — plus deux trous que
+cette phase a mis au jour.
+
+**Des traces RÉELLES, et ce qu'elles ont révélé**
+
+Quatre enregistrements d'un téléphone réel, à Dakar, sont désormais figés comme
+fixtures : une sortie vélo de 7 km et 1 379 points, et les trois essais de
+marche qui avaient produit le signalement « les mètres ne sont pas pris ».
+
+Les traces fabriquées ont bien servi — elles isolent un phénomène et se règlent
+à volonté — mais elles ressemblent à ce qu'on CROIT que fait un GPS. Une vraie
+trace porte les irrégularités qu'on n'aurait pas pensé à simuler.
+
+**Et elles ont tranché une question restée ouverte.** Les trois essais de marche
+mesurent zéro, et c'est la bonne réponse : leur chemin brut fait 35 à 43 m, mais
+l'excursion maximale depuis le départ n'est que de 7 à 13 m, pour une précision
+annoncée de 4 à 8 m. La personne a fait quelques pas et est revenue, dans un
+rayon à peine plus grand que l'incertitude de son propre récepteur. Les 35 m de
+« chemin » sont, pour l'essentiel, du bruit.
+
+La conséquence est dite franchement dans le test : **un aller-retour de moins
+d'une quinzaine de mètres n'est pas mesurable par un téléphone.** Ce n'est pas un
+défaut qu'on peut régler, c'est la limite de l'instrument. Pour éprouver la
+marche, il faut marcher en ligne, sur cinquante mètres au moins.
+
+`cyclo:export-trace` fige n'importe quelle trace en fixture : le jour où le club
+signale un nouveau défaut, la première chose à faire est de conserver
+l'enregistrement qui l'a produit, avant qu'il ne soit recalculé ou perdu.
+
+**Les cinq invariants, rassemblés et nommés**
+
+Ils étaient éprouvés — mais en morceaux, à travers quatre fichiers. Un invariant
+vérifié en pièces détachées n'est plus lisible comme un invariant : personne ne
+pouvait répondre à « la règle I2 est-elle vérifiée ? » sans relire tout le
+dossier. Chaque règle porte maintenant son nom, sa formulation et sa preuve.
+
+**Deux d'entre elles sont vérifiées STRUCTURELLEMENT, pas par l'exemple.**
+
+I5 lit le schéma de la base : un exemple ne peut prouver qu'aucune colonne
+monétaire n'est un flottant, il prouve seulement que celles auxquelles on a
+pensé ne le sont pas. Celle qu'on ajoutera dans six mois, en `decimal(10,2)` par
+réflexe, passerait sans que rien ne crie. Même chose pour I1 et I2, qui lisent la
+table des routes plutôt que trois URL choisies à la main.
+
+**Le web n'avait aucun test — c'était le trou le plus sérieux**
+
+`web/src/lib/recording.ts` est le code qui tourne dans le navigateur du membre
+pendant sa sortie. C'est lui qui a produit les deux signalements GPS, et il
+n'avait aucun test automatisé. Le serveur recalcule tout à l'arrivée et fait
+foi — mais entre le départ et l'arrivée, un compteur qui ment est la seule chose
+que le membre voit.
+
+Vitest en environnement `node`, et non jsdom : ce qui est testé ici est de la
+logique, pas du rendu. Le rendu, lui, est vérifié dans un vrai Chrome — jsdom ne
+calcule aucune mise en page et ne dirait rien de ce qui plante à l'affichage.
+
+Les mêmes fixtures réelles y passent, lues **à leur emplacement d'origine** :
+les dupliquer aurait créé une seconde vérité qui aurait divergé au premier
+ré-export.
+
+**Les fichiers miroirs se surveillent enfin tout seuls**
+
+`CLAUDE.md` demande de tenir quatre paires de fichiers identiques à la main.
+Ce n'est pas une crainte théorique : c'est arrivé deux fois. Le seuil du vélo
+est resté à 1 m côté client quand le serveur utilisait 5 — le compteur affiché
+ne correspondait pas au résultat final. Puis le seuil d'immobilité a été abaissé
+sur le web avant de l'être sur le mobile : la même promenade aurait compté sur un
+appareil et pas sur l'autre.
+
+Ces divergences sont invisibles à la relecture. Une machine, elle, ne glisse pas
+sur un `0.8` qui aurait dû être `0.3`. Les clients sont comparés au SERVEUR, pas
+l'un à l'autre — sans quoi ils pourraient être d'accord tous les deux, et tous
+les deux faux.
+
+Le test a été éprouvé en cassant volontairement une valeur : il échoue en
+nommant la ligne exacte. **Un test qui passe sans rien vérifier est pire qu'un
+test absent — il rassure.**
+
+**Total**
+
+| Tier | Tests | Commande |
+|---|---|---|
+| Backend | 465 | `cd backend && php artisan test` |
+| Mobile | 65 | `cd mobile && npx jest` |
+| Web | 7 | `cd web && npm test` |
+
+Auxquels s'ajoute la vérification de rendu dans un vrai Chrome, qui couvre les
+dix écrans et le parcours de connexion.
 
 ---
 

@@ -1,0 +1,184 @@
+{
+    "source": "Enregistrement réel, Cyclo Dakar",
+    "sport": "WALKING",
+    "recorded_at": "2026-09-01T14:51:11+00:00",
+    "points_count": 16,
+    "points": [
+        {
+            "seq": 0,
+            "lat": "14.7369850",
+            "lng": "-17.4628233",
+            "altitude_m": 35.87,
+            "speed_mps": null,
+            "accuracy_m": 20.19,
+            "heading_deg": null,
+            "recorded_at": "2026-09-01 14:50:44.268",
+            "is_paused": false
+        },
+        {
+            "seq": 1,
+            "lat": "14.7369850",
+            "lng": "-17.4628233",
+            "altitude_m": 41.82,
+            "speed_mps": null,
+            "accuracy_m": 23.8,
+            "heading_deg": null,
+            "recorded_at": "2026-09-01 14:51:13.924",
+            "is_paused": false
+        },
+        {
+            "seq": 2,
+            "lat": "14.7369466",
+            "lng": "-17.4628890",
+            "altitude_m": 31.32,
+            "speed_mps": 5.35,
+            "accuracy_m": 23.56,
+            "heading_deg": 259.1,
+            "recorded_at": "2026-09-01 14:51:17.125",
+            "is_paused": false
+        },
+        {
+            "seq": 3,
+            "lat": "14.7369446",
+            "lng": "-17.4629332",
+            "altitude_m": 35.09,
+            "speed_mps": 3.28,
+            "accuracy_m": 14.38,
+            "heading_deg": 277.73,
+            "recorded_at": "2026-09-01 14:51:19.628",
+            "is_paused": false
+        },
+        {
+            "seq": 4,
+            "lat": "14.7369337",
+            "lng": "-17.4628820",
+            "altitude_m": 35.16,
+            "speed_mps": 1.33,
+            "accuracy_m": 10.33,
+            "heading_deg": 205.31,
+            "recorded_at": "2026-09-01 14:51:21.629",
+            "is_paused": false
+        },
+        {
+            "seq": 5,
+            "lat": "14.7369554",
+            "lng": "-17.4628750",
+            "altitude_m": 35.11,
+            "speed_mps": 1.33,
+            "accuracy_m": 10.63,
+            "heading_deg": 183.16,
+            "recorded_at": "2026-09-01 14:51:22.630",
+            "is_paused": false
+        },
+        {
+            "seq": 6,
+            "lat": "14.7369579",
+            "lng": "-17.4628548",
+            "altitude_m": 35.41,
+            "speed_mps": 0.96,
+            "accuracy_m": 10.86,
+            "heading_deg": 183.16,
+            "recorded_at": "2026-09-01 14:51:23.631",
+            "is_paused": false
+        },
+        {
+            "seq": 7,
+            "lat": "14.7369476",
+            "lng": "-17.4628549",
+            "altitude_m": 35.33,
+            "speed_mps": 0.73,
+            "accuracy_m": 11.06,
+            "heading_deg": 183.16,
+            "recorded_at": "2026-09-01 14:51:24.630",
+            "is_paused": false
+        },
+        {
+            "seq": 8,
+            "lat": "14.7369367",
+            "lng": "-17.4628666",
+            "altitude_m": 35.3,
+            "speed_mps": 0.72,
+            "accuracy_m": 11.24,
+            "heading_deg": 183.16,
+            "recorded_at": "2026-09-01 14:51:25.631",
+            "is_paused": false
+        },
+        {
+            "seq": 9,
+            "lat": "14.7369390",
+            "lng": "-17.4628490",
+            "altitude_m": 35.14,
+            "speed_mps": 0.81,
+            "accuracy_m": 9.78,
+            "heading_deg": 315,
+            "recorded_at": "2026-09-01 14:51:26.623",
+            "is_paused": false
+        },
+        {
+            "seq": 10,
+            "lat": "14.7369422",
+            "lng": "-17.4628530",
+            "altitude_m": 35.47,
+            "speed_mps": 0.8,
+            "accuracy_m": 9.4,
+            "heading_deg": 317.46,
+            "recorded_at": "2026-09-01 14:51:27.629",
+            "is_paused": false
+        },
+        {
+            "seq": 11,
+            "lat": "14.7369433",
+            "lng": "-17.4628554",
+            "altitude_m": 35.33,
+            "speed_mps": 0.81,
+            "accuracy_m": 9.01,
+            "heading_deg": 274.57,
+            "recorded_at": "2026-09-01 14:51:28.635",
+            "is_paused": false
+        },
+        {
+            "seq": 12,
+            "lat": "14.7369576",
+            "lng": "-17.4628666",
+            "altitude_m": 35.85,
+            "speed_mps": 0.81,
+            "accuracy_m": 11.25,
+            "heading_deg": 274.57,
+            "recorded_at": "2026-09-01 14:51:32.942",
+            "is_paused": false
+        },
+        {
+            "seq": 13,
+            "lat": "14.7369576",
+            "lng": "-17.4628666",
+            "altitude_m": 35.85,
+            "speed_mps": 0.81,
+            "accuracy_m": 11.25,
+            "heading_deg": 274.57,
+            "recorded_at": "2026-09-01 14:51:39.341",
+            "is_paused": false
+        },
+        {
+            "seq": 14,
+            "lat": "14.7369791",
+            "lng": "-17.4628478",
+            "altitude_m": 35.85,
+            "speed_mps": null,
+            "accuracy_m": 14.06,
+            "heading_deg": null,
+            "recorded_at": "2026-09-01 14:51:45.369",
+            "is_paused": false
+        },
+        {
+            "seq": 15,
+            "lat": "14.7369811",
+            "lng": "-17.4628392",
+            "altitude_m": 31.64,
+            "speed_mps": null,
+            "accuracy_m": 12.57,
+            "heading_deg": null,
+            "recorded_at": "2026-09-01 14:51:51.388",
+            "is_paused": false
+        }
+    ]
+}
