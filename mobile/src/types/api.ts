@@ -669,3 +669,167 @@ export interface EventTally {
   max_participants: number | null
   seats_left: number | null
 }
+
+/* -------------------------------------------------------------------------- */
+/* Encaissements — PHASE 12                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type ParticipationStatusCode = 'DRAFT' | 'OPEN' | 'CLOSED' | 'CANCELLED'
+
+export type ParticipationLineStatusCode =
+  | 'NON_PAYE'
+  | 'PARTIELLEMENT_PAYE'
+  | 'PAYE'
+  | 'ANNULE'
+
+/**
+ * Une dette : ce qu'un membre doit sur une collecte.
+ *
+ * `paid_amount` et `status` sont **dérivés** des paiements réels et exposés en
+ * lecture seule. Aucune route ne les accepte en entrée.
+ *
+ * Miroir de `web/src/types/api.ts`. Le mobile n'affiche pas encore les
+ * campagnes de collecte elles-mêmes : il n'a besoin que de la ligne de dette,
+ * pour l'écran « ce que je dois » et pour l'encaissement après un scan.
+ */
+export interface ParticipationLine {
+  id: number
+  member?: {
+    uuid: string
+    matricule: string
+    full_name: string
+    initials: string
+    photo_url: string | null
+    phone_formatted: string | null
+  }
+  expected_amount: Fcfa
+  paid_amount: Fcfa
+  remaining_amount: Fcfa
+  status: ParticipationLineStatusCode
+  status_label: string
+  collector?: { uuid: string; name: string } | null
+  /** La collecte d'origine — présente sur l'écran de terrain du collecteur. */
+  participation?: {
+    uuid: string
+    name: string
+    status: ParticipationStatusCode
+    due_on: string | null
+  }
+  last_payment_at: string | null
+  note: string | null
+  /**
+   * Le droit d'encaisser SUR CETTE LIGNE, décidé par le serveur.
+   *
+   * Un collecteur n'encaisse que les dettes qui lui sont assignées ; le
+   * trésorier passe partout. Deviner cette règle ici produirait un bouton qui
+   * répond 403 — au bord d'une route, avec un membre qui attend.
+   */
+  can_pay: boolean
+}
+
+/**
+ * Un reçu.
+ *
+ * Ce que ce type ne contient PAS mérite d'être noté : aucun solde de caisse.
+ * Le solde n'est pas l'affaire de celui qui paie sa cotisation, et le glisser
+ * dans un reçu l'exposerait à tout membre par la porte de derrière.
+ *
+ * Une annulation est **visible**, avec son motif : cacher qu'un reçu a été
+ * annulé serait le meilleur moyen qu'un membre se croie à jour.
+ */
+export interface Payment {
+  uuid: string
+  /** `RC-2026-000042`. C'est ce qu'un membre montre quand il conteste. */
+  receipt_number: string
+
+  /** Entier de FCFA, jamais formaté ni arrondi. */
+  amount: Fcfa
+
+  method: PaymentMethodCode
+  method_label: string
+  reference: string | null
+  note: string | null
+
+  /** Date métier, distincte du jour de la saisie. */
+  paid_on: string
+  created_at: string
+
+  member?: { uuid: string; matricule: string; full_name: string }
+  participation?: { uuid: string; name: string }
+  collector?: { uuid: string; name: string }
+
+  cancelled: boolean
+  cancelled_at: string | null
+  cancellation_reason: string | null
+  cancelled_by?: string | null
+}
+
+/**
+ * Saisie d'un encaissement.
+ *
+ * `idempotency_key` est OBLIGATOIRE et c'est délibéré : elle protège le membre
+ * d'un double débit quand le réseau lâche entre l'envoi et la réponse. Le
+ * client la fabrique une fois et la RÉUTILISE à l'identique sur chaque
+ * tentative de la même saisie — c'est ce qui distingue un rejeu d'un second
+ * versement volontaire du même montant, lequel est légitime.
+ *
+ * Ce qui n'y figure pas et n'y figurera jamais : `collected_by`, `paid_amount`,
+ * `status`. Le serveur les détermine (docs/finance.md, règle I3).
+ */
+export interface PaymentInput {
+  /** L'uuid du membre — aucune clé interne ne circule. */
+  member: string
+  /** Entier de FCFA. */
+  amount: number
+  method: PaymentMethodCode
+  reference?: string | null
+  note?: string | null
+  idempotency_key: string
+  paid_on?: string
+}
+
+/** Ce qu'un membre doit et ce qu'il a payé. */
+export interface MyDues {
+  dues: ParticipationLine[]
+  payments: Payment[]
+}
+
+export interface MyDuesTotals {
+  expected_amount: Fcfa
+  paid_amount: Fcfa
+  remaining_amount: Fcfa
+}
+
+/**
+ * Ce qu'un collecteur a encaissé sur une période.
+ *
+ * Les annulations sont comptées **à part**. Ce n'est pas une statistique de
+ * confort : c'est le contrôle contre le risque qu'un collecteur encaisse et
+ * garde (docs/finance.md §6). Les mélanger masquerait exactement ce qu'on
+ * cherche à voir.
+ */
+export interface CollectorTally {
+  collector: { uuid: string; name: string }
+  collected_amount: Fcfa
+  collected_count: number
+  cancelled_amount: Fcfa
+  cancelled_count: number
+}
+
+/**
+ * L'état de la caisse.
+ *
+ * `complete` est à `false` tant que les dépenses ne sont pas saisies
+ * (phase 13). Aucune interface ne doit présenter ce montant comme le solde
+ * réel du club : confondre « tout ce qui est enregistré » et « tout ce qui
+ * existe » ruinerait la confiance du bureau.
+ */
+export interface CashState {
+  name: string
+  opening_balance: Fcfa
+  balance: Fcfa
+  /** Le même solde recalculé depuis le grand livre. Un écart = une anomalie. */
+  derived_balance: Fcfa
+  complete: boolean
+  incomplete_reason: string | null
+}

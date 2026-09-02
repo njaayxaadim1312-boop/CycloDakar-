@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, ArrowLeft, UserMinus, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { PaymentDialog } from '@/components/payments/PaymentDialog'
+import { PaymentsSection } from '@/components/payments/PaymentsSection'
 import { Avatar } from '@/components/ui/Avatar'
 import { ApiError } from '@/lib/api'
 import { formatDate, formatFcfa } from '@/lib/format'
@@ -191,6 +193,15 @@ export function ParticipationDetailPage() {
         onExempt={(lineId) => exempt.mutate(lineId)}
         onRemove={(lineId) => remove.mutate(lineId)}
       />
+
+      {/* --- Les reçus ------------------------------------------------------
+          En dernier, et c'est voulu : le bureau vient d'abord voir qui doit
+          quoi. Le journal des versements sert à vérifier après coup, ou à
+          retrouver un reçu qu'un membre conteste. */}
+      <PaymentsSection
+        participationUuid={participation.uuid}
+        canCancel={participation.permissions?.update === true}
+      />
     </div>
   )
 }
@@ -330,6 +341,9 @@ function Lines({
 }) {
   const lines = participation.lines ?? []
   const canManage = participation.permissions?.assign === true
+  // On n'encaisse que sur une collecte OUVERTE : un brouillon n'engage
+  // personne, et une collecte close a vu ses comptes arrêtés.
+  const collecting = participation.status === 'OPEN'
 
   return (
     <section className="rounded-[var(--cd-radius-lg)] border border-[var(--cd-border)] bg-[var(--cd-surface)] p-5">
@@ -353,6 +367,8 @@ function Lines({
             <LineRow
               key={line.id}
               line={line}
+              participationUuid={participation.uuid}
+              collecting={collecting}
               canManage={canManage}
               busy={busy}
               onExempt={() => onExempt(line.id)}
@@ -367,12 +383,16 @@ function Lines({
 
 function LineRow({
   line,
+  participationUuid,
+  collecting,
   canManage,
   busy,
   onExempt,
   onRemove,
 }: {
   line: ParticipationLine
+  participationUuid: string
+  collecting: boolean
   canManage: boolean
   busy: boolean
   onExempt: () => void
@@ -410,6 +430,13 @@ function LineRow({
         </p>
         <p className="text-xs text-[var(--cd-text-muted)]">{line.status_label}</p>
       </div>
+
+      {/* Le droit d'encaisser vient du SERVEUR (`can_pay`) : un collecteur
+          n'encaisse que les dettes qui lui sont assignées, un trésorier passe
+          partout. Le deviner ici donnerait un bouton qui répond 403. */}
+      {collecting && line.can_pay && !cancelled && (
+        <PaymentDialog participationUuid={participationUuid} line={line} />
+      )}
 
       {canManage && !cancelled && (
         <button

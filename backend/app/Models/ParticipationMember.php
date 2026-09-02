@@ -8,6 +8,7 @@ use App\Enums\ParticipationMemberStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Une dette : ce qu'un membre doit sur une collecte.
@@ -65,6 +66,20 @@ final class ParticipationMember extends Model
         return $this->belongsTo(User::class, 'assigned_collector_id');
     }
 
+    /**
+     * Les encaissements portés par cette dette, annulés compris.
+     *
+     * La relation ne filtre PAS les paiements annulés : un membre qui se
+     * présente avec un reçu doit le retrouver, même annulé. C'est
+     * `paidToDate()` qui écarte les annulations pour le calcul du montant.
+     *
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'participation_member_id');
+    }
+
     /* ---------------------------------------------------------------------- */
 
     /** Ce qu'il reste à percevoir. Jamais négatif. */
@@ -76,13 +91,12 @@ final class ParticipationMember extends Model
     /**
      * Recalcule le montant encaissé et le statut depuis les paiements réels.
      *
-     * PHASE 12 — la somme viendra de la table `payments`, filtrée sur les
-     * paiements non annulés. D'ici là il n'existe aucun paiement, donc le
-     * total vaut zéro, et c'est la vérité : le module d'encaissement n'est pas
-     * livré. On ne simule pas de montants pour faire joli.
-     *
-     * La méthode existe dès maintenant pour que le statut n'ait, dès le
-     * premier jour, qu'UN SEUL chemin d'écriture.
+     * **Seul chemin d'écriture** de `paid_amount` et de `status`. La somme
+     * repart toujours de la table des paiements : jamais d'incrément sur
+     * l'ancienne valeur. Un incrément se trompe dès qu'une opération est
+     * rejouée ou qu'une annulation passe entre-temps, et l'erreur se fige
+     * ensuite pour toujours ; un recalcul complet, lui, se corrige tout seul
+     * au mouvement suivant.
      */
     public function recalculate(): void
     {
@@ -97,16 +111,24 @@ final class ParticipationMember extends Model
         $this->update([
             'paid_amount' => $paid,
             'status' => ParticipationMemberStatus::derive($this->expected_amount, $paid),
+            // Dérivée elle aussi, et non « estampillée à maintenant » :
+            // annuler le dernier paiement doit faire reculer cette date, pas
+            // laisser croire à un versement qui n'existe plus.
+            'last_payment_at' => $this->payments()
+                ->whereNull('cancelled_at')
+                ->max('created_at'),
         ]);
     }
 
     /**
      * Somme réellement encaissée sur cette ligne.
      *
-     * PHASE 12 : `$this->payments()->whereNull('cancelled_at')->sum('amount')`.
+     * Les paiements annulés en sont exclus — ils restent en base, avec leur
+     * contre-passation au grand livre, mais ils ne comptent plus dans ce que
+     * le membre a versé.
      */
     private function paidToDate(): int
     {
-        return 0;
+        return (int) $this->payments()->whereNull('cancelled_at')->sum('amount');
     }
 }

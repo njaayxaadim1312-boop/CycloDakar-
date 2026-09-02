@@ -8,8 +8,10 @@ use App\Http\Controllers\Api\V1\ActivityController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\EventParticipationController;
+use App\Http\Controllers\Api\V1\FinanceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\ParticipationController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\MemberController;
 use App\Http\Controllers\Api\V1\StatsController;
 use Illuminate\Support\Facades\Route;
@@ -265,6 +267,58 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 ->name('lines.update');
             Route::delete('/{participation}/members/{line}', [ParticipationController::class, 'removeLine'])
                 ->name('lines.destroy');
+
+            // Encaissements — PHASE 12.
+            Route::get('/{participation}/payments', [PaymentController::class, 'index'])
+                ->name('payments.index');
+            Route::post('/{participation}/payments', [PaymentController::class, 'store'])
+                ->name('payments.store');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Encaissements — PHASE 12
+        |----------------------------------------------------------------------
+        |
+        | La saisie vit sous /participations : un encaissement n'existe pas
+        | sans la dette qu'il solde. Ce bloc-ci ne porte que ce qui se lit ou
+        | se corrige APRES coup, et qui n'a plus besoin de sa collecte pour
+        | etre designe.
+        |
+        | /payments/mine est la SEULE route financiere ouverte a un simple
+        | membre, et elle ne montre que lui. Declaree avant /{payment} pour que
+        | « mine » ne soit pas pris pour un uuid — meme piege qu'en phase 10.
+        |
+        | L'annulation est un POST et non un DELETE : rien n'est supprime. Une
+        | contre-passation est ecrite au grand livre et le paiement reste
+        | consultable, marque annule. Un verbe DELETE laisserait croire le
+        | contraire a quiconque lit la liste des routes (docs/finance.md, I2).
+        */
+        Route::prefix('payments')->name('payments.')->group(function (): void {
+            Route::get('/mine', [PaymentController::class, 'mine'])->name('mine');
+            Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');
+            Route::post('/{payment}/cancel', [PaymentController::class, 'cancel'])->name('cancel');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Caisse — PHASE 12 (partiel)
+        |----------------------------------------------------------------------
+        |
+        | Il n'existe AUCUNE route qui accepte un solde en entree, et il ne
+        | doit jamais en exister : le solde est derive (docs/finance.md, I1).
+        |
+        | /finance/collections est le controle contre le risque F7 — qui a
+        | encaisse combien, et combien d'annulations. Ce n'est pas une
+        | statistique de confort.
+        |
+        | Le journal de caisse complet, les depenses et les rapports arrivent
+        | en PHASE 13 et 14.
+        */
+        Route::prefix('finance')->name('finance.')->group(function (): void {
+            Route::get('/cash', [FinanceController::class, 'cash'])->name('cash');
+            Route::get('/collections', [FinanceController::class, 'collections'])
+                ->name('collections');
         });
 
         /*
@@ -279,7 +333,6 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         | PHASE 9  — /events, /events/{id}/join
         | PHASE 10 — /participations
         | PHASE 11 — /members/resolve/{qr_token}
-        | PHASE 12 — /participations/{id}/payments
         | PHASE 13 — /finance/dashboard, /finance/transactions, /expenses
         | PHASE 14 — /finance/reports
         | PHASE 15 — /activities/{id}/video, /video-jobs/{id}

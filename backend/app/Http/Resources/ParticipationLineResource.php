@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\ParticipationMember;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -52,8 +53,34 @@ final class ParticipationLineResource extends JsonResource
                 ? null
                 : ['uuid' => $this->collector->uuid, 'name' => $this->collector->name]),
 
+            /*
+             | La collecte d'origine, quand elle est chargee.
+             |
+             | Indispensable a l'ecran de terrain, qui liste les dettes d'un
+             | collecteur TOUTES COLLECTES CONFONDUES : sans elle, on saurait
+             | qui doit combien, mais pas a quel titre — ni ou envoyer
+             | l'encaissement.
+             */
+            'participation' => $this->whenLoaded('participation', fn () => [
+                'uuid' => $this->participation->uuid,
+                'name' => $this->participation->name,
+                'status' => $this->participation->status->value,
+                'due_on' => $this->participation->due_on?->toDateString(),
+            ]),
+
             'last_payment_at' => $this->last_payment_at?->toIso8601String(),
             'note' => $this->note,
+
+            /*
+             | Le droit d'encaisser SUR CETTE LIGNE, decide par le serveur.
+             |
+             | Un collecteur n'encaisse que les dettes qui lui sont assignees ;
+             | le tresorier passe partout. Laisser le client deviner cette
+             | regle produirait un bouton qui repond 403 — et un collecteur qui
+             | ne comprend pas pourquoi, au bord d'une route, avec un membre
+             | qui attend.
+             */
+            'can_pay' => $request->user()?->can('create', [Payment::class, $this->resource]) ?? false,
         ];
     }
 }

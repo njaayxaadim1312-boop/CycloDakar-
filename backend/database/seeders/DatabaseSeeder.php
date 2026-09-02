@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             AdminUserSeeder::class,
+            // La caisse et les postes du grand livre. Idempotent : sans caisse
+            // par defaut, aucun encaissement n'est possible.
+            FinanceSeeder::class,
         ]);
     }
 }
