@@ -1115,10 +1115,104 @@ maintenant la fin du chargement.
 
 ---
 
-## ⏳ Phase 20 — Déploiement
+## ✅ Phase 20 — Déploiement *(terminée)*
 
-HTTPS, hébergement, sauvegardes automatiques, supervision, build Android (APK/AAB)
-et iOS, procédure de mise à jour.
+**Un déploiement, pas une démonstration.**
+
+`demarrer-demo.ps1` existait déjà et lançait `php artisan serve` sur le dossier
+de travail. Le déploiement installe l'application **ailleurs**, avec sa propre
+base, son propre compte MySQL et ses propres caches.
+
+Ce n'est pas de la propreté : `config:cache` fige les valeurs du `.env` dans un
+fichier PHP, et fait dans le dossier de développement il ferait tourner **la
+suite de tests sur la base de production** — phpunit surcharge des variables
+d'environnement qu'une configuration mise en cache ne consulte plus. Le dossier
+séparé est ce qui rend les caches sûrs.
+
+**La sonde de santé savait mentir**
+
+Elle ne vérifiait que la base et le stockage. Elle disait donc « tout va bien »
+avec un ouvrier de file mort : les rappels de cotisation cessaient de partir, et
+on ne l'aurait découvert qu'en s'étonnant, des semaines plus tard, que plus
+personne ne paie. C'est le défaut du journal d'audit de la phase 19, transposé à
+la production — une garde à laquelle on se fie sans qu'elle garde quoi que ce
+soit.
+
+Elle surveille maintenant la file et le planificateur, avec **deux niveaux de
+panne**. Base ou stockage en échec : 503, l'application ne peut rien servir.
+File ou planificateur arrêtés : 200 et `degraded`, parce que les écrans marchent
+et qu'un 503 ferait redémarrer un serveur en parfait état.
+
+Un planificateur arrêté ne peut pas signaler son propre arrêt : il écrit donc un
+battement chaque minute, et c'est son **absence** qui le trahit. Deux pièges
+évités au passage — une file pleine qui avance va très bien (alerter là-dessus
+crierait au loup à chaque envoi groupé), et un travail différé n'est pas un
+travail en retard.
+
+**Le bug que seul un vrai test pouvait trouver**
+
+Le déploiement passait tous ses contrôles, et **plus aucun membre ne pouvait
+utiliser l'application**. Apache ne transmet pas l'en-tête `Authorization` aux
+programmes FastCGI depuis la version 2.4.13 : il porte des mots de passe, et il
+faut le lui autoriser explicitement (`CGIPassAuth On`).
+
+Le symptôme est trompeur. La connexion **réussit** et rend un jeton, puis chaque
+appel suivant répond 401. On soupçonne le jeton, le mobile, l'horloge — alors que
+le serveur ne l'a jamais reçu.
+
+La sonde de santé, elle, est une route publique : elle répondait parfaitement.
+D'où l'ajout, dans le script, d'une vérification qu'aucune sonde publique ne
+remplace : **un appel authentifié doit être servi, et une route protégée doit
+refuser sans jeton**. Un déploiement qui ne teste que des routes publiques ne
+teste pas l'application.
+
+**Une alerte franche : le code source servi en clair**
+
+Une tentative de répartition de charge par `<If>` a servi, lorsqu'aucune
+condition ne correspondait, **`index.php` en clair avec un code 200**. Un
+aiguillage conditionnel vers PHP a pour cas de repli « fichier statique ». La
+règle qui envoie le `.php` à PHP est donc restée inconditionnelle, et la
+répartition a été abandonnée.
+
+**La limite, dite plutôt que maquillée**
+
+Sous Windows, `php-cgi` ne sait pas se dupliquer et le répartiteur d'Apache
+refuse de relayer du FastCGI vers un chemin Windows. **Une requête PHP à la
+fois** — mesuré, pas supposé : huit requêtes en parallèle prennent exactement le
+même temps qu'en série, environ 120 ms chacune.
+
+Cela tient pour un club, Apache servant seul les fichiers statiques qui font
+l'essentiel du trafic. La vraie réponse est PHP-FPM sur un hébergement Linux, où
+le problème n'existe pas — et où tout le reste du document s'applique tel quel.
+
+**Les sauvegardes, avec la seule vérification qui compte**
+
+« Une sauvegarde jamais restaurée n'est pas une sauvegarde » était écrit dans la
+documentation depuis la phase 1. `sauvegarde.ps1 -Verifier` **rejoue réellement
+l'archive** dans une base jetable et compare les nombres de lignes, table par
+table. Un `mysqldump` interrompu produit un fichier volumineux et inutilisable :
+sa taille ne dit rien, et l'erreur n'apparaît qu'au moment où l'on en a besoin.
+
+Le `.env` est exclu des archives : il porte le mot de passe de la base, et une
+archive finit un jour sur une clé USB.
+
+**Ce qui reste à faire, et qui ne dépend pas de moi**
+
+Un hébergement permanent suppose un compte chez un hébergeur, donc une
+inscription au nom du club. L'application n'a aucune dépendance à Windows : sur
+n'importe quel serveur Linux avec PHP 8.3, MySQL et Nginx, les sections 1 à 9 de
+`docs/deployment.md` s'appliquent telles quelles.
+
+Les builds mobiles (`eas build`) demandent de même un compte Expo, et iOS un
+compte Apple Developer payant. La diffusion d'un APK aux membres, elle, ne
+demande rien — c'est souvent le plus pragmatique pour un club.
+
+**Vérifié**
+
+499 tests backend, et le déploiement éprouvé de bout en bout à travers son
+adresse publique : sonde `healthy` sur ses quatre contrôles, connexion réelle,
+appel authentifié servi, route protégée refusée sans jeton, `.env` inaccessible
+(403), et la page de connexion rendue dans un vrai Chrome.
 
 ---
 
